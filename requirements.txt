@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+databricks-sdk
+pandas
+openpyxl
+snowflake-connector-python

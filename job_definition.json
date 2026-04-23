@@ -1,0 +1,39 @@
+{
+  "name": "Demand Plan Dashboard - Weekly Refresh",
+  "tasks": [
+    {
+      "task_key": "refresh_from_snowflake",
+      "spark_python_task": {
+        "python_file": "dbfs:/FileStore/ebp_dashboard/scripts/run_refresh_job.py"
+      },
+      "new_cluster": {
+        "spark_version": "15.4.x-scala2.12",
+        "node_type_id": "m5d.large",
+        "num_workers": 0,
+        "spark_conf": {
+          "spark.master": "local[*]",
+          "spark.databricks.cluster.profile": "singleNode"
+        },
+        "custom_tags": {
+          "ResourceClass": "SingleNode"
+        }
+      },
+      "libraries": [
+        {"pypi": {"package": "snowflake-connector-python"}},
+        {"pypi": {"package": "pandas"}},
+        {"pypi": {"package": "openpyxl"}}
+      ],
+      "timeout_seconds": 1800
+    }
+  ],
+  "schedule": {
+    "quartz_cron_expression": "0 0 7 ? * MON",
+    "timezone_id": "America/Los_Angeles",
+    "pause_status": "UNPAUSED"
+  },
+  "max_concurrent_runs": 1,
+  "tags": {
+    "team": "ebp",
+    "dashboard": "demand-plan"
+  }
+}

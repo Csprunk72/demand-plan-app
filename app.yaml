@@ -1,0 +1,32 @@
+command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+env:
+  - name: DASHBOARD_DBFS_PATH
+    value: "dbfs:/FileStore/ebp_dashboard/demand_plan_blob.json"
+  - name: SNOWFLAKE_ACCOUNT
+    value: "nike-nike_aws_us_west_2"
+  - name: SNOWFLAKE_WAREHOUSE
+    value: "EDA_MPO_ZOOMANALYTICS_PROD"
+  - name: SNOWFLAKE_USER
+    value: "CSPRU1"
+  - name: SNOWFLAKE_ROLE
+    value: "DF_CSPRU1"
+  - name: SNOWFLAKE_DATABASE
+    value: "DA_DSM_SCANALYTICS_PROD"
+  - name: SNOWFLAKE_SCHEMA
+    value: "INTEGRATED"
+  - name: SNOWFLAKE_AUTH_METHOD
+    value: "password"
+  # SNOWFLAKE_PASSWORD: use a Databricks secret resource + valueFrom, or set via your org’s pattern — never commit it.
+  #
+  # AIR Insights — edit in THIS FILE (Cursor), save, redeploy. Do not paste YAML into PowerShell.
+  # Set the real URL when you have it (empty keeps chat in “not configured” until you fill it).
+  - name: AIR_INSIGHTS_API_URL
+    value: ""
+  # Token: prefer a secret resource on the app (Resources → Secret), then swap the next two lines for:
+  # - name: AIR_INSIGHTS_API_TOKEN
+  #   valueFrom: <resource-key-you-chose>
+  # Until then, leave TOKEN unset or use a local-only test — never commit real tokens.
+  # - name: AIR_INSIGHTS_JSON_KEY_MESSAGE
+  #   value: "prompt"
+  # - name: AIR_INSIGHTS_CONTEXT_PREFIX
+  #   value: "Scope: EBP Demand Plan dashboard only; OP Submit + Snowflake APO; cite evidence."

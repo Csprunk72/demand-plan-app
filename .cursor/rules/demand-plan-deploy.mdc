@@ -1,0 +1,33 @@
+---
+description: How to run Databricks data refresh + app deploy when the user says Deploy
+alwaysApply: true
+---
+
+# Demand Plan app — “Deploy” workflow
+
+## Important limitation
+
+The AI **does not** have its own Databricks session. It can only run commands in **your** Cursor-integrated terminal, which must already be authenticated to Databricks (same as when you use `databricks` in PowerShell yourself).
+
+## When the user says “Deploy” (or “publish”, “redploy”, “ship it”)
+
+1. If they also want a **new OP Submit** in the data blob, run the publish script (from repo root `demand-plan-app`):
+   - `.\scripts\publish.ps1`  
+   or with explicit name: `.\scripts\publish.ps1 -AppName "<their-app-name>"`  
+2. If they need **app code only** (no new Excel / Snowflake refresh):  
+   - `.\scripts\publish.ps1 -Data None -AppName "<name>"`  
+3. If **Snowflake refresh fails** locally (VPN/creds), offer `-Data Excel` to use `push_demand_plan.py` (needs `Demand Plan Dashboard.xlsx` in the same folder as in that script’s defaults) or only `-Data None` to deploy code.
+
+## One-time setup for the user (so “Deploy” works in terminal)
+
+- Run `databricks auth login` (or ensure profile `4428761713917856` works — same profile as in `push_demand_plan.py` / `refresh_from_snowflake.py`).
+- Set user env `DATABRICKS_APP_NAME` to the app name from `databricks apps list` (or pass `-AppName` each time).
+- Optional: set `OP_SUBMIT_XLSX` to the full path of their OP Submit file.
+
+## Optional
+
+- `.\scripts\publish.ps1 -CopyOpToDbfs` also copies the Excel to `dbfs:/FileStore/ebp_dashboard/OP_Submit.xlsx` for the **scheduled job** path used by `run_refresh_job.py`.
+
+## Do not
+
+- Commit tokens or paste secrets in chat. Use Databricks’s supported auth and env vars for AIR (`AIR_INSIGHTS_*`) only in app settings, not in git.

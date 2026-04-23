@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+.env
+.env.*
+*.egg-info/
+dist/
+build/
+
+# Local / generated data (large)
+temp_blob*.json
+inspect_blob*.py
+explore_apo*.py
+test_sf_conn.py
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Databricks local cache
+.databricks/sync-snapshots/

@@ -1,0 +1,2724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EBP Demand Plan Dashboard</title>
+<!-- data: favicon avoids a round-trip; /favicon.ico still defined in app.py for direct probes -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a0a'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%23FA5400'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   RESET & DESIGN SYSTEM  (matched to EBP Business Health)
+   ══════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 13px; -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+/* WC26 Launch Report base: dark shell, white primary text (see Downloads WC26 HTML) */
+body.wc26-skin {
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  background: #0a0a0a;
+  color: #ffffff;
+  min-height: 100vh;
+}
+body.wc26-skin .view { color: #ffffff; }
+body.wc26-skin table.dt td { color: #ffffff !important; }
+body.wc26-skin table.dt th { color: #e5e5e5; }
+body.wc26-skin .insight-text { color: #a0a0a0 !important; }
+body.wc26-skin .card .c-value { color: #ffffff; }
+body.wc26-skin #opdpCards .card .c-label { color: #666666; }
+::selection { background: #FA5400; color: #fff; }
+
+:root {
+  /* WC26 Launch Report accent (see Downloads WC26 HTML) */
+  --orange: #FA5400;
+  --orange-light: #2a1810;
+  --green: #00B050;
+  --green-bg: #ecfdf5;
+  --red: #ef4444;
+  --red-bg: #fef2f2;
+  --yellow: #f59e0b;
+  --yellow-bg: #fffbeb;
+  --dark: #111827;
+  --dark-2: #1e293b;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.05);
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -2px rgba(0,0,0,.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.04);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --accent: var(--orange);
+  --text: #111827;
+  --bg: #f0f2f5;
+  --border: var(--gray-200);
+  --hdr: var(--dark);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HEADER
+   ══════════════════════════════════════════════════════════════ */
+.main-hdr {
+  background: #111111;
+  color: #fff; padding: 10px 32px;
+  position: relative; overflow: hidden;
+  border-bottom: 2px solid #FA5400;
+  box-shadow: 0 1px 4px rgba(0,0,0,.4);
+}
+.main-hdr::before { display: none; }
+.main-hdr { font-size: 13px; font-weight: 700; letter-spacing: -0.2px; position: relative; z-index: 1; }
+
+/* ══════════════════════════════════════════════════════════════
+   LOADING OVERLAY
+   ══════════════════════════════════════════════════════════════ */
+#loading {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #0a0a0a;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #fff; font-family: inherit; font-size: 1rem; font-weight: 600;
+}
+#loading::after {
+  content: ''; display: block; width: 40px; height: 40px; margin-top: 24px;
+  border: 4px solid rgba(250,84,0,.2); border-top-color: #FA5400;
+  border-radius: 50%; animation: spin .8s linear infinite;
+}
+#loading.loading-error::after { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ══════════════════════════════════════════════════════════════
+   MAIN TAB BAR
+   ══════════════════════════════════════════════════════════════ */
+.tab-bar {
+  background: #111111; padding: 0 32px; display: flex; gap: 0;
+  align-items: center; position: sticky; top: 0; z-index: 200;
+  box-shadow: 0 1px 4px rgba(0,0,0,.35); margin: 0; border-bottom: 1px solid #2a2a2a; flex-wrap: nowrap;
+}
+.tab-bar button {
+  padding: 10px 22px 8px; font-size: 11.5px; font-weight: 700;
+  color: #a0a0a0; cursor: pointer; border: none; background: none;
+  border-bottom: 2px solid transparent; transition: all .15s;
+  text-transform: uppercase; letter-spacing: 0.7px; white-space: nowrap;
+}
+.tab-bar button:hover { color: #fff; }
+.tab-bar button.active { color: #FA5400; border-bottom-color: #FA5400; }
+
+/* ══════════════════════════════════════════════════════════════
+   BRAND SUB-TAB BAR
+   ══════════════════════════════════════════════════════════════ */
+.brand-bar {
+  display: flex; gap: 0; margin: 0; padding: 0 32px;
+  background: #111111; border-bottom: 1px solid #2a2a2a;
+}
+.brand-bar button {
+  padding: 9px 20px 7px; font-size: 12px; font-weight: 600;
+  color: #a0a0a0; cursor: pointer; border: none; background: none;
+  border-bottom: 2px solid transparent; transition: all .15s;
+  text-transform: uppercase; letter-spacing: 0.5px; border-radius: 0;
+}
+.brand-bar button:hover { color: #e5e5e5; }
+.brand-bar button.active {
+  color: #FA5400; border-bottom-color: #FA5400;
+  background: none;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   VIEW PANELS
+   ══════════════════════════════════════════════════════════════ */
+.view { display: none; padding: 0 0 2rem 0; }
+.view.active { display: block; }
+
+/* ══════════════════════════════════════════════════════════════
+   FILTERS
+   ══════════════════════════════════════════════════════════════ */
+.filters {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start;
+  margin-bottom: 0; padding: 12px 32px; background: #111111;
+  border-bottom: 1px solid #2a2a2a;
+}
+.filter-group { position: relative; display: flex; flex-direction: column; gap: 2px; }
+.filter-label {
+  font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: #666666; display: block;
+}
+.ms-btn {
+  font-family: inherit; font-size: 12px; padding: 5px 26px 5px 8px;
+  border: 1px solid #333333; border-radius: var(--radius-sm);
+  background: #0a0a0a; color: #a0a0a0; cursor: pointer;
+  min-width: 110px; max-width: 200px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+  transition: border-color .15s, box-shadow .15s; position: relative;
+  display: flex; align-items: center; gap: 4px;
+}
+.ms-btn:hover { border-color: var(--gray-400); }
+.ms-btn .arrow { font-size: 10px; color: var(--gray-500); margin-left: auto; pointer-events: none; }
+.ms-panel {
+  display: none; position: absolute; top: calc(100% + 2px); left: 0;
+  background: #1a1a1a; border: 1px solid #2a2a2a;
+  border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,.5);
+  z-index: 300; min-width: 170px; max-height: 300px;
+  overflow-y: auto; padding: 4px 0;
+}
+.ms-panel.open { display: block; }
+.ms-panel label {
+  display: flex; align-items: center; gap: 6px; padding: 5px 12px;
+  cursor: pointer; font-size: 11.5px; white-space: nowrap;
+  transition: background .1s;
+}
+.ms-panel label:hover { background: #222222; }
+.ms-panel label input { accent-color: var(--orange); cursor: pointer; width: 13px; height: 13px; flex-shrink: 0; }
+.ms-actions {
+  display: flex; gap: 4px; padding: 4px 8px;
+  border-bottom: 1px solid #2a2a2a; margin-bottom: 2px;
+}
+.ms-actions button {
+  font-family: inherit; font-size: 10px; font-weight: 600;
+  padding: 3px 8px; border: 1px solid #333333;
+  border-radius: 4px; background: #0a0a0a; color: #a0a0a0;
+  cursor: pointer; transition: all .15s;
+}
+.ms-actions button:hover { border-color: var(--orange); color: var(--orange); }
+select.ms-btn {
+  cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center;
+}
+select.ms-btn:focus { outline: none; border-color: var(--orange); box-shadow: 0 0 0 3px rgba(254,80,0,.1); }
+
+/* ══════════════════════════════════════════════════════════════
+   SECTION / INSIGHT HEADERS
+   ══════════════════════════════════════════════════════════════ */
+.hdr-text { font-size: 20px; font-weight: 700; color: #ffffff; line-height: 1.2; margin-bottom: 4px; padding: 0 32px; }
+.insight-text { font-size: 12px; color: #a0a0a0; margin-bottom: 8px; line-height: 1.5; padding: 0 32px; }
+
+/* ══════════════════════════════════════════════════════════════
+   SUMMARY CARDS
+   ══════════════════════════════════════════════════════════════ */
+.card-row { display: flex; gap: 16px; flex-wrap: wrap; margin: 0; padding: 20px 32px 0; }
+.card {
+  background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: var(--radius); padding: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.4); position: relative; overflow: hidden;
+  min-width: 130px; transition: transform .15s, box-shadow .15s;
+}
+.card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.45); }
+.card .c-label {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: #666666; margin-bottom: 4px;
+}
+.card .c-value { font-size: 22px; font-weight: 800; color: #ffffff; line-height: 1.1; letter-spacing: -0.5px; }
+
+/* ══════════════════════════════════════════════════════════════
+   DATA TABLES
+   ══════════════════════════════════════════════════════════════ */
+table.dt {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: var(--radius); box-shadow: 0 1px 4px rgba(0,0,0,.4);
+  font-size: 12px; min-width: 900px;
+}
+table.dt th {
+  position: sticky; top: 0; background: #1a1a1a; color: #e5e5e5;
+  font-weight: 600; font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.6px; padding: 10px 10px; text-align: center;
+  white-space: nowrap; border-bottom: 2px solid #FA5400; z-index: 10;
+}
+table.dt th:first-child { text-align: left; border-radius: var(--radius) 0 0 0; }
+table.dt th:last-child { border-radius: 0 var(--radius) 0 0; }
+table.dt td {
+  padding: 7px 10px; text-align: center; border-bottom: 1px solid #2a2a2a;
+  white-space: nowrap; font-variant-numeric: tabular-nums; transition: background .1s; color: #e5e5e5;
+}
+table.dt td:first-child { text-align: left; font-weight: 600; color: #fff; position: sticky; left: 0; background: #1a1a1a; z-index: 5; }
+table.dt tr:hover td { background: #222222; }
+table.dt tr:hover td:first-child { background: #222222; }
+table.dt tr.total-row { background: #1f1400; font-weight: 700; }
+table.dt tr.total-row td { border-top: 2px solid #FA5400; }
+table.dt tr:nth-child(even) { background: #141414; }
+table.dt tr.detail-header td { background: #161616; font-weight: 600; font-size: 12px; text-align: left; }
+table.dt tr.detail-row td:first-child { padding-left: 1.5rem; font-weight: 400; }
+
+/* ══════════════════════════════════════════════════════════════
+   METRIC COLORS
+   ══════════════════════════════════════════════════════════════ */
+.pos { color: var(--green); font-weight: 600; }
+.neg { color: var(--red); font-weight: 600; }
+
+/* ══════════════════════════════════════════════════════════════
+   G&D TABLES
+   ══════════════════════════════════════════════════════════════ */
+.gd-section { margin-top: 1.5rem; padding: 0 32px; }
+.gd-div { margin-bottom: 1.5rem; }
+.gd-div h3 { font-size: 13px; font-weight: 700; margin-bottom: 8px; color: #fff; }
+table.gd {
+  border-collapse: separate; border-spacing: 0; width: 100%;
+  font-size: 12px; margin-bottom: 8px; background: #1a1a1a;
+  border: 1px solid #2a2a2a; border-radius: var(--radius); box-shadow: 0 1px 4px rgba(0,0,0,.4); overflow: hidden;
+}
+table.gd th {
+  padding: 8px 10px; font-weight: 600; text-align: center;
+  white-space: nowrap; font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+table.gd th.gh { background: var(--green); color: #fff; }
+table.gd th.dh { background: var(--red); color: #fff; }
+table.gd td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #2a2a2a; white-space: nowrap; font-variant-numeric: tabular-nums; color: #e5e5e5; }
+table.gd td:first-child { text-align: center; }
+table.gd td:nth-child(2) { text-align: left; }
+table.gd tr.gd-subtotal { font-weight: 700; background: #161616; }
+table.gd tr.gd-allother { font-style: italic; color: #666; }
+table.gd tr.gd-divtotal { font-weight: 700; background: #1f1400; border-top: 2px solid #FA5400; }
+
+/* ══════════════════════════════════════════════════════════════
+   TOGGLE ROWS
+   ══════════════════════════════════════════════════════════════ */
+.toggle-row {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0; padding: 0;
+}
+.toggle-row span {
+  font-size: 11px; font-weight: 700; color: #a0a0a0;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.toggle-row button {
+  font-family: inherit; font-size: 11px; font-weight: 600;
+  padding: 4px 14px; border: 1px solid #333333;
+  border-radius: var(--radius-sm); background: #0a0a0a; color: #a0a0a0;
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.toggle-row button:hover:not(.active-toggle) { background: #222222; color: #e5e5e5; }
+.toggle-row button.active-toggle { background: #FA5400; color: #fff; border-color: #FA5400; }
+
+/* ══════════════════════════════════════════════════════════════
+   CHART CONTAINERS
+   ══════════════════════════════════════════════════════════════ */
+.chart-card {
+  background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: var(--radius); box-shadow: 0 1px 4px rgba(0,0,0,.4);
+  overflow: hidden; transition: box-shadow .15s; margin: 0 32px;
+}
+.chart-card:hover { box-shadow: var(--shadow-md); }
+
+/* ══════════════════════════════════════════════════════════════
+   SCROLLBARS
+   ══════════════════════════════════════════════════════════════ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gray-400); }
+
+/* ══════════════════════════════════════════════════════════════
+   AI INSIGHTS BANNER
+   ══════════════════════════════════════════════════════════════ */
+.ai-insights {
+  margin: 16px 32px 0; padding: 16px 20px;
+  background: linear-gradient(135deg, #111827 0%, #1e293b 100%);
+  border-radius: var(--radius); position: relative; overflow: hidden;
+  border-left: 4px solid var(--orange);
+}
+.ai-insights::before {
+  content: ''; position: absolute; top: -40%; right: -3%;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(254,80,0,.10) 0%, transparent 70%);
+  pointer-events: none;
+}
+.ai-insights-hdr {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px; position: relative; z-index: 1;
+}
+.ai-insights-hdr svg { flex-shrink: 0; }
+.ai-insights-hdr span {
+  font-size: 11px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 1.2px; color: var(--orange);
+}
+.ai-insights ul {
+  list-style: none; margin: 0; padding: 0; position: relative; z-index: 1;
+}
+.ai-insights li {
+  font-size: 12.5px; color: #cbd5e1; line-height: 1.6;
+  padding: 2px 0; padding-left: 16px; position: relative;
+}
+.ai-insights li::before {
+  content: '\25B8'; position: absolute; left: 0; color: var(--orange); font-size: 11px; top: 3px;
+}
+.ai-insights .ai-highlight { color: #fff; font-weight: 700; }
+.ai-insights .ai-pos { color: #4ade80; font-weight: 700; }
+.ai-insights .ai-neg { color: #f87171; font-weight: 700; }
+.ai-insights .ai-note {
+  font-size: 10px; color: #64748b; margin-top: 8px; position: relative; z-index: 1;
+  font-style: italic;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 860px) {
+  .filters { padding: 12px 16px; }
+  .card-row { padding: 16px 16px 0; }
+  .gd-section { padding: 0 16px; }
+  .hdr-text, .insight-text { padding: 0 16px; }
+  .main-hdr { padding: 18px 16px 14px; }
+  .tab-bar { padding: 0 16px; }
+  .brand-bar { padding: 0 16px; }
+  .chart-card { margin: 0 16px; }
+  .ai-insights { margin: 12px 16px 0; }
+}
+@media print { .tab-bar { position: static; box-shadow: none; } table.dt th { position: static; } .card:hover { transform: none; box-shadow: var(--shadow); } }
+
+/* ══════════════════════════════════════════════════════════════
+   EXECUTIVE OVERVIEW (WC-style shell)
+   ══════════════════════════════════════════════════════════════ */
+.exec-shell { background: #0a0a0a; color: #e5e5e5; padding: 0 0 2rem 0; border-bottom: 2px solid #1f1f1f; }
+.exec-shell-hdr { padding: 1.25rem 0 0.75rem; border-bottom: 1px solid #2a2a2a; margin-bottom: 1rem; }
+.exec-shell-hdr h2 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; color: #fff; }
+.exec-shell-hdr h2 span { color: var(--orange); }
+.exec-shell-sub { font-size: 0.78rem; color: #888; margin-top: 0.35rem; max-width: 52rem; line-height: 1.45; }
+.exec-brand-bar { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.exec-brand-bar button { padding: 8px 18px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.6px; border: 1px solid #333; background: #141414; color: #94a3b8; cursor: pointer; border-radius: 4px; font-family: inherit; }
+.exec-brand-bar button.active { border-color: var(--orange); color: #fff; background: #1a0f08; color: var(--orange); }
+.exec-ai-chat-btn { margin-left: auto !important; border-color: #FA5400 !important; color: #FA5400 !important; }
+.exec-filters-wrap { background: #121212 !important; border: 1px solid #2a2a2a !important; border-radius: 8px; margin-bottom: 0.75rem !important; padding: 12px 16px !important; }
+.exec-season-note { font-size: 0.72rem; color: #8b9aaf; margin: 0 0 1rem 0; padding: 8px 12px; background: #111827; border-radius: 6px; border-left: 3px solid var(--orange); }
+.exec-kpi-section { margin-bottom: 1.25rem; }
+.exec-kpi-section-title { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #666; margin-bottom: 0.5rem; }
+.exec-kpi-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.exec-kpi-card { background: #161616; border: 1px solid #2a2a2a; border-radius: 10px; padding: 12px 14px; min-width: 140px; flex: 1; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+.exec-kpi-card h4 { font-size: 0.62rem; font-weight: 700; color: #777; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.exec-kpi-metric { margin-top: 8px; padding-top: 8px; border-top: 1px solid #222; }
+.exec-kpi-metric:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+.exec-kpi-label { font-size: 0.58rem; color: #666; text-transform: uppercase; letter-spacing: 0.06em; }
+.exec-kpi-val { font-size: 1.05rem; font-weight: 800; color: #fff; font-family: 'SF Mono', Consolas, ui-monospace, monospace; margin: 2px 0; }
+.exec-kpi-sub { font-size: 0.68rem; color: #94a3b8; line-height: 1.35; }
+.exec-kpi-sub .pos { color: #4ade80; }
+.exec-kpi-sub .neg { color: #f87171; }
+.exec-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin: 1.5rem 0 2rem; }
+.exec-tile { cursor: pointer; border-radius: 12px; border: 1px solid #2a2a2a; background: linear-gradient(165deg, #1c1c1c 0%, #121212 100%);
+  min-height: 118px; padding: 12px; position: relative; overflow: hidden; transition: border-color .15s, transform .12s;
+  text-align: left; font-family: inherit; color: inherit; }
+.exec-tile:hover { border-color: #FE5000; transform: translateY(-2px); }
+.exec-tile-visual { height: 52px; border-radius: 8px; margin-bottom: 8px; background-size: cover; background-position: center; }
+.exec-tile-title { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: #fff; line-height: 1.3; }
+.exec-tile-hint { font-size: 0.58rem; color: #666; margin-top: 4px; line-height: 1.3; }
+.exec-chart-block { margin-top: 1.75rem; padding-top: 1rem; border-top: 1px solid #262626; }
+.exec-chart-block h3 { font-size: 0.95rem; font-weight: 700; color: #fff; margin-bottom: 0.6rem; }
+.exec-hint { font-size: 0.65rem; font-weight: 500; color: #888; text-transform: none; letter-spacing: 0; }
+.exec-ai-panel { position: fixed; right: 0; top: 0; bottom: 0; width: min(420px, 100vw); background: #0f172a; border-left: 1px solid #334155; z-index: 500;
+  box-shadow: -8px 0 24px rgba(0,0,0,.45); display: flex; flex-direction: column; }
+.exec-ai-panel-hdr { padding: 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+.exec-ai-panel-hdr span { font-size: 0.8rem; font-weight: 800; color: #fff; }
+.exec-ai-panel-hdr button { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; line-height: 1; }
+.exec-ai-msgs { flex: 1; overflow-y: auto; padding: 12px 16px; font-size: 0.78rem; color: #cbd5e1; }
+.exec-ai-row { margin-bottom: 10px; padding: 8px 10px; border-radius: 8px; background: #1e293b; }
+.exec-ai-row.user { background: #1e1b4b; margin-left: 12px; }
+.exec-ai-input-row { padding: 12px 16px; border-top: 1px solid #334155; display: flex; gap: 8px; }
+.exec-ai-input-row textarea { flex: 1; min-height: 44px; max-height: 120px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: #e2e8f0; padding: 8px; font-family: inherit; font-size: 0.78rem; resize: vertical; }
+.exec-ai-input-row button { padding: 8px 14px; border-radius: 8px; border: none; background: var(--orange); color: #fff; font-weight: 700; cursor: pointer; font-size: 0.72rem; }
+.exec-ai-note { font-size: 0.65rem; color: #64748b; padding: 0 16px 12px; line-height: 1.4; }
+body.exec-ai-open { overflow: hidden; }
+
+/* KPI grey skeleton (WC-style placeholders while data loads) */
+@keyframes exec-kpi-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.exec-kpi-skel-card {
+  background: #161616; border: 1px solid #2a2a2a; border-radius: 10px; padding: 12px 14px;
+  min-width: 140px; flex: 1; min-height: 118px; position: relative; overflow: hidden;
+}
+.exec-kpi-skel-card::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.06), transparent);
+  animation: exec-kpi-shimmer 1.2s ease-in-out infinite;
+}
+.exec-kpi-skel-line { height: 10px; border-radius: 4px; background: #2a2a2a; margin-bottom: 10px; width: 55%; }
+.exec-kpi-skel-line.short { width: 35%; }
+.exec-kpi-skel-line.tall { height: 22px; width: 70%; margin-top: 8px; }
+/* —— WC26 Launch Report shell (see Downloads WC26 HTML) —— */
+.wc26-bg2 { --wc-bg: #111111; --wc-bg2: #0a0a0a; --wc-card: #1a1a1a; --wc-border: #2a2a2a; --wc-border2: #333333; --wc-text: #ffffff; --wc-sub: #a0a0a0; --wc-muted: #666666; --wc-sh: 0 1px 4px rgba(0,0,0,.4); }
+.top-bar {
+  background: #111; border-bottom: 2px solid #FA5400; padding: 10px 32px;
+  display: flex; align-items: center; justify-content: space-between; box-shadow: var(--wc-sh,0 1px 4px rgba(0,0,0,.4));
+}
+.top-bar-left { font-size: 13px; font-weight: 700; color: #fff; }
+.top-bar-left span { color: #666; font-weight: 400; }
+.top-bar-center { font-size: 12px; color: #a0a0a0; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
+.badge-refresh { display: inline-flex; align-items: center; gap: 5px; background: #1f1400; border: 1px solid #3d2800; color: #FA5400; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+.btn-reload-dbfs { cursor: pointer; font: inherit; display: inline-flex; align-items: center; gap: 5px; background: #1f1400; border: 1px solid #FA5400; color: #FA5400; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; }
+.btn-reload-dbfs:hover { background: #2a1a0a; }
+.btn-reload-dbfs:disabled { opacity: 0.55; cursor: not-allowed; }
+.page-header {
+  background: #111; padding: 16px 32px 12px; border-bottom: 1px solid #2a2a2a;
+}
+.page-header h1 { font-size: 20px; font-weight: 800; letter-spacing: -.4px; color: #fff; margin-bottom: 4px; }
+.page-header .headline { font-size: 12px; color: #a0a0a0; font-style: italic; line-height: 1.4; }
+.exec-wc-stack { background: #111; border-bottom: 1px solid #2a2a2a; padding: 0 0 8px; }
+.exec-wc-stack .kpi-row { display: flex; gap: 12px; padding: 16px 32px 8px; flex-wrap: wrap; }
+.exec-wc-stack .kpi { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 14px 16px; flex: 1; min-width: 140px; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+.exec-wc-stack .kpi-label { font-size: 10px; color: #666; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; }
+.exec-wc-stack .kpi-value { font-size: 20px; font-weight: 800; margin-top: 3px; color: #fff; font-family: 'SF Mono','Consolas',ui-monospace,monospace; }
+.exec-wc-stack .kpi-sub { font-size: 11px; margin-top: 2px; }
+.exec-wc-stack .kpi-sub.neutral { color: #a0a0a0; }
+.filter-bar.exec-wc-stack { display: block; }
+.exec-wc-stack .filter-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 8px 32px; border-top: 1px solid #2a2a2a; }
+.exec-wc-stack .filter-label { font-size: 10px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: .6px; min-width: 100px; }
+.exec-filters-wc { display: flex; flex-direction: column; padding: 0 32px 10px; background: #111; border: none; gap: 0; margin: 0; }
+.exec-filters-wc .filter-group { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; border-top: 1px solid #2a2a2a; padding: 8px 0; gap: 10px; width: 100%; }
+.exec-filters-wc .filter-label { min-width: 180px; }
+.brand-btn-wc {
+  display: inline-flex; align-items: center; padding: 5px 14px; border-radius: 7px; border: 1.5px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04); color: #9ca3af; font-size: 11px; font-weight: 800; letter-spacing: 0.08em;
+  cursor: pointer; text-transform: uppercase; font-family: inherit;
+}
+.brand-btn-wc:hover { border-color: rgba(255,255,255,0.3); color: #e5e7eb; background: rgba(255,255,255,0.08); }
+.brand-btn-wc.active, .exec-wc-stack .brand-btn-wc.active { background: rgba(250,84,0,0.15); border-color: #FA5400; color: #FA5400; font-weight: 900; }
+.exec-module-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.exec-wc-stack .filter-btn, .wc-module-btn.filter-btn {
+  padding: 5px 14px; border-radius: 20px; border: 1px solid #2a2a2a; background: #0a0a0a; color: #a0a0a0; font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.exec-wc-stack .filter-btn:hover, .wc-module-btn:hover { border-color: #FA5400; color: #FA5400; background: #222; }
+.exec-wc-stack .filter-btn.active, .wc-module-btn.filter-btn.active { background: #FA5400; border-color: #FA5400; color: #fff; font-weight: 700; }
+.f-sport-wc { flex-wrap: wrap; align-items: flex-start !important; }
+.sport-split-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; flex: 1; min-width: 280px; }
+@media (max-width: 900px) { .sport-split-cols { grid-template-columns: 1fr; } }
+.sport-col-hdr { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #FA5400; margin-bottom: 6px; }
+.sport-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.sport-pill { padding: 3px 8px; font-size: 10px; border-radius: 14px; }
+.sport-pill.filter-btn.active, .exec-wc-stack .sport-pill.filter-btn.active { background: #FA5400; border-color: #FA5400; color: #fff; }
+/* WC26 filter-bar pill buttons (matches WC26 .filter-btn) */
+body.wc26-skin .filters:not(.exec-filters-wc) .ms-btn { border-radius: 20px; border-color: #333; background: #0a0a0a; color: #a0a0a0; }
+body.wc26-skin .filters:not(.exec-filters-wc) .ms-btn:hover { border-color: #FA5400; color: #FA5400; }
+.data-source-banner { margin: 0; padding: 10px 32px; font-size: 12px; font-weight: 600; border-bottom: 1px solid #2a2a2a; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.data-source-banner.ok { background: #0a1f14; color: #86efac; border-left: 4px solid #22c55e; }
+.data-source-banner.warn { background: #1f1400; color: #fdba74; border-left: 4px solid #FA5400; }
+.data-source-banner code { font-size: 11px; background: rgba(0,0,0,.35); padding: 2px 8px; border-radius: 4px; color: #e5e5e5; }
+.exec-shell { background: #0a0a0a; }
+</style>
+</head>
+<body class="wc26-skin">
+<div id="loading">EBP Demand Plan Dashboard</div>
+<header class="top-bar">
+  <div class="top-bar-left" style="display:flex;align-items:center;gap:12px;">
+    <svg height="20" viewBox="0 0 69 30" fill="#FA5400" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M19.2 2.3C12.8 6.4 3.6 14.2 1.2 18.5c-1.8 3.1-1.6 5 .5 5.3 2.8.4 8.4-2.2 15.8-7.4L29.3.1c-2.4.2-6.1.8-10.1 2.2z"/><path d="M68.2.1L40.8 13.6c-7.4 5.2-13 8-15.8 7.4-2.1-.3-2.3-2.2-.5-5.3.5-.9 1.3-1.9 2.2-3L18.3 17c-3.3 4.6-4.4 8.2-2.4 10 2.3 2 7.8 1 15.3-3.8C38 18.8 52.4 9.2 68.2.1z"/></svg>
+    Nike Inc. <span>| EBP Demand Plan</span>
+  </div>
+  <div class="top-bar-center">Unit Investment &amp; Operating Plan</div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end;">
+    <button type="button" id="reloadDbfsBtn" class="btn-reload-dbfs" title="POST /api/v1/refresh — re-read demand_plan_blob.json from DBFS (clears the ~1h server cache)">&#9679; Reload from DBFS</button>
+    <div id="refreshTs" class="top-bar-right" style="font-size:11px;font-weight:600;color:#a0a0a0;max-width:28rem;text-align:right;line-height:1.35;"></div>
+  </div>
+</header>
+<div class="page-header">
+  <h1>Demand Plan <span style="color:#FA5400">Dashboard</span></h1>
+  <p class="headline">Aligned to the WC26 Launch Report shell (typography, dark cards, orange accent). Data is loaded from the JSON blob (Snowflake APO + OP Submit when the pipeline runs).</p>
+</div>
+<div id="dataSourceBanner" class="data-source-banner" style="display:none;" role="status"></div>
+<nav class="tab-bar" id="mainTabs">
+  <button class="active" data-tab="exec">Executive Overview</button>
+  <button data-tab="uif">Unit Flow &amp; G&amp;D</button>
+  <button data-tab="opdp">OP + Unit Investment</button>
+  <button data-tab="sro">Seasonal Revenue Overview</button>
+  <button data-tab="dpfr">Franchise Breakdown</button>
+  <button data-tab="gr">Growth Rate Overview</button>
+  <button data-tab="wf">Waterfall</button>
+</nav>
+
+<!-- ═══════════ EXECUTIVE OVERVIEW ═══════════ -->
+<div id="execView" class="view active">
+  <div class="exec-shell">
+    <div class="filter-bar exec-wc-stack" id="execWcFilterStack">
+      <div class="kpi-row" id="execHeroKpi"></div>
+      <div class="filter-row exec-wc-nike">
+        <span class="filter-label">Nike Inc.</span>
+        <div><strong style="color:#fff;font-size:14px;">Consolidated</strong>
+        <span style="margin-left:10px;color:#a0a0a0;font-size:12px;">Nike Brand + Jordan Brand (filters apply below)</span></div>
+      </div>
+      <div class="filter-row exec-wc-brand">
+        <span class="filter-label">Nike &amp; Jordan</span>
+        <div class="brand-filter-wrap" style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="active brand-btn-wc" data-exec-brand="Nike">Nike</button>
+          <button type="button" class="brand-btn-wc" data-exec-brand="Jordan">Jordan</button>
+          <button type="button" class="exec-ai-chat-btn" id="execAiChatToggle" title="AIR Insights chat (configure API)">AIR Insights</button>
+        </div>
+      </div>
+      <div class="filter-row" id="execWcModuleRow">
+        <span class="filter-label">Module views</span>
+        <div class="exec-module-btns" id="execWcModuleBtns">
+          <button type="button" class="wc-module-btn filter-btn" data-wc-tab="uif" title="Placeholder — opens tab">Unit Flow &amp; G&amp;D</button>
+          <button type="button" class="wc-module-btn filter-btn" data-wc-tab="opdp">OP + Unit Investment</button>
+          <button type="button" class="wc-module-btn filter-btn" data-wc-tab="sro">Seasonal Revenue</button>
+          <button type="button" class="wc-module-btn filter-btn" data-wc-tab="dpfr">Franchise</button>
+          <button type="button" class="wc-module-btn filter-btn" data-wc-tab="gr">Growth Rate</button>
+          <button type="button" class="wc-module-btn filter-btn" data-wc-tab="wf">Waterfall</button>
+        </div>
+      </div>
+      <div class="filters exec-filters-wc" id="execFilters"></div>
+    </div>
+    <div id="execSeasonNote" class="exec-season-note"></div>
+    <div class="exec-shell-hdr" style="padding-top:0.5rem;">
+      <h2>Executive <span>Overview</span></h2>
+      <p class="exec-shell-sub">KPIs match the OPDP tab math. Chart blocks use <strong>calendar year ≥ 2026</strong> seasons where noted.</p>
+    </div>
+    <div id="execKpiMount"></div>
+    <div class="exec-chart-block">
+      <h3>Growth Rate Overview <span class="exec-hint">— Season / Season · calendar year ≥ 2026</span></h3>
+      <div id="execGrChart" style="width:100%;height:400px;"></div>
+    </div>
+    <div class="exec-chart-block">
+      <h3>Waterfall <span class="exec-hint">— Latest 2026+ season in selection · Global · GLB WHS $</span></h3>
+      <div id="execWfChart" style="width:100%;height:440px;"></div>
+    </div>
+  </div>
+</div>
+
+<div id="execAiPanel" class="exec-ai-panel" style="display:none;" aria-hidden="true">
+  <div class="exec-ai-panel-hdr">
+    <span>AIR Insights</span>
+    <button type="button" id="execAiChatClose" aria-label="Close">&times;</button>
+  </div>
+  <div class="exec-ai-msgs" id="execAiMsgs"><div class="exec-ai-row">Ask about Nike metrics, trends, or OP Submit context. Connect your AIR API endpoint on the server to enable live replies.</div></div>
+  <div class="exec-ai-input-row">
+    <textarea id="execAiInput" placeholder="e.g. How does Ho26 SR compare to prior submit?" rows="2"></textarea>
+    <button type="button" id="execAiSend">Send</button>
+  </div>
+  <div class="exec-ai-note">Governed AIR assistant: SQL-backed insights, evidence-based summaries. Requires server-side AIR configuration — not a generic LLM.</div>
+</div>
+
+<!-- ═══════════ UIF TAB ═══════════ -->
+<div id="uifView" class="view">
+  <div class="brand-bar" id="uifBrandBar"><button class="active" data-uif-brand="Nike">Nike</button><button data-uif-brand="Jordan">Jordan</button></div>
+  <div class="filters" id="uifFilters"></div>
+  <div id="uifAiInsights" class="ai-insights"></div>
+  <div id="uifChart" style="width:100%;height:380px;"></div>
+  <div id="uifTableWrap" style="margin-top:1rem;"></div>
+  <div class="gd-section"><h2 style="font-size:1.1rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem;">Gainer &amp; Drainer</h2><div id="gdWrap"></div></div>
+</div>
+
+<!-- ═══════════ OPDP TAB ═══════════ -->
+<div id="opdpView" class="view">
+  <div class="brand-bar"><button class="active" data-opdp-brand="Nike Brand">Nike</button><button data-opdp-brand="Jordan Brand">Jordan</button></div>
+  <div class="filters" id="opdpFilters"></div>
+  <div id="opdpAiInsights" class="ai-insights"></div>
+  <div class="card-row" id="opdpCards"></div>
+  <div id="opdpDataStatus"></div>
+  <div id="opdpTableWrap" style="margin-top:0.5rem;"></div>
+</div>
+
+<!-- ═══════════ SRO TAB ═══════════ -->
+<div id="sroView" class="view">
+  <div class="brand-bar"><button class="active" data-sro-brand="Nike Brand">Nike</button><button data-sro-brand="Jordan Brand">Jordan</button></div>
+  <div class="filters" id="sroFilters"></div>
+  <div id="sroAiInsights" class="ai-insights"></div>
+  <div id="sroInsight" class="insight-text"></div>
+  <div id="sroTableWrap" style="margin-top:0.5rem;"></div>
+</div>
+
+<!-- ═══════════ DPFR TAB ═══════════ -->
+<div id="dpfrView" class="view">
+  <div class="brand-bar"><button class="active" data-dpfr-brand="Nike Brand">Nike</button><button data-dpfr-brand="Jordan Brand">Jordan</button></div>
+  <div class="filters" id="dpfrFilters"></div>
+  <div id="dpfrAiInsights" class="ai-insights"></div>
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+    <div class="toggle-row" style="margin:0;"><span>Metric:</span><button class="active-toggle" id="dpfrToggleU" onclick="APP.dpfrMetric='u';renderDpfr();">Units</button><button id="dpfrToggleD" onclick="APP.dpfrMetric='fpd';renderDpfr();">Dollars</button></div>
+    <div class="toggle-row" style="margin:0;"><span>Top Franchises:</span><button id="dpfrTopN5" onclick="APP.dpfrTopN=5;renderDpfr();">5</button><button class="active-toggle" id="dpfrTopN10" onclick="APP.dpfrTopN=10;renderDpfr();">10</button><button id="dpfrTopN15" onclick="APP.dpfrTopN=15;renderDpfr();">15</button><button id="dpfrTopN20" onclick="APP.dpfrTopN=20;renderDpfr();">20</button></div>
+  </div>
+  <div id="dpfrChartTitle" style="font-size:1rem;font-weight:700;color:var(--accent);margin-bottom:0.3rem;"></div>
+  <div id="dpfrChart" style="width:100%;height:420px;"></div>
+  <div style="margin-top:1.5rem;border-top:2px solid #E0E0E0;padding-top:1rem;">
+    <div id="dpfrBarTitle" style="font-size:1rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem;"></div>
+    <div id="dpfrBarWrap" style="width:100%;overflow-x:auto;"></div>
+  </div>
+  <div id="dpfrTableWrap" style="margin-top:1rem;"></div>
+  <div style="margin-top:1.5rem;border-top:2px solid #00B050;padding-top:1rem;">
+    <div id="dpfrGainerTitle" style="font-size:1rem;font-weight:700;color:#2E7D32;margin-bottom:0.5rem;"></div>
+    <div id="dpfrGainerWrap" style="width:100%;overflow-x:auto;"></div>
+  </div>
+  <div style="margin-top:1.5rem;border-top:2px solid #C62828;padding-top:1rem;">
+    <div id="dpfrDrainerTitle" style="font-size:1rem;font-weight:700;color:#C62828;margin-bottom:0.5rem;"></div>
+    <div id="dpfrDrainerWrap" style="width:100%;overflow-x:auto;"></div>
+  </div>
+</div>
+
+<!-- ═══════════ GR TAB ═══════════ -->
+<div id="grView" class="view">
+  <div class="brand-bar"><button class="active" data-gr-brand="Nike">Nike</button><button data-gr-brand="Jordan">Jordan</button></div>
+  <div class="filters" id="grFilters"></div>
+  <div id="grAiInsights" class="ai-insights"></div>
+  <div class="toggle-row"><span>View:</span><button class="active-toggle" id="grToggleSS" onclick="APP.grMode='ss';renderGr();">Season / Season</button><button id="grToggleGG" onclick="APP.grMode='gg';renderGr();">Gate / Gate</button></div>
+  <div id="grHeader" class="hdr-text"></div>
+  <div id="grSub" class="insight-text"></div>
+  <div id="grChart" style="width:100%;height:420px;"></div>
+  <div style="margin-top:0.5rem;font-size:0.78rem;color:#666;">SR = Seasonal Revenue &nbsp;|&nbsp; GF+AA+AO = GF+AA+AO $ &nbsp;|&nbsp; WHS = GLB WHS $ (APO)</div>
+</div>
+
+<!-- ═══════════ WF TAB ═══════════ -->
+<div id="wfView" class="view">
+  <div class="brand-bar"><button class="active" data-wf-brand="Nike">Nike</button><button data-wf-brand="Jordan">Jordan</button></div>
+  <div class="filters" id="wfFilters"></div>
+  <div id="wfAiInsights" class="ai-insights"></div>
+  <div class="card-row" id="wfCards"></div>
+  <div id="wfChartTitle" style="font-size:1rem;font-weight:700;color:var(--accent);margin:0.3rem 0;"></div>
+  <div id="wfChart" style="width:100%;height:460px;"></div>
+  <div id="wfTableTitle" style="font-size:1rem;font-weight:700;color:var(--accent);margin:1rem 0 0.4rem;"></div>
+  <div id="wfTableWrap"></div>
+  <div id="wfTop10Section" style="margin-top:2rem;">
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:0.6rem;">
+      <div id="wfTop10Title" style="font-size:1.1rem;font-weight:700;color:var(--text);flex:1;"></div>
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <span style="font-size:0.82rem;font-weight:600;color:var(--text);">Group by:</span>
+        <button class="active-toggle" id="wfTop10BtnFr" onclick="APP.wfTop10Mode='fr';renderWfTop10();" style="padding:0.25em 0.8em;font-size:0.78rem;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-weight:600;">Franchise</button>
+        <button id="wfTop10BtnMc" onclick="APP.wfTop10Mode='mc';renderWfTop10();" style="padding:0.25em 0.8em;font-size:0.78rem;border:1px solid var(--border);border-radius:4px;background:#fff;cursor:pointer;font-weight:600;">Merch Class</button>
+      </div>
+    </div>
+    <div id="wfTop10Chart" style="width:100%;height:420px;"></div>
+    <div style="margin-top:0.4rem;font-size:0.75rem;color:#888;padding-left:4px;">Grey bar = PY F4 total &nbsp;|&nbsp; Colored bar = current season at latest gate</div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONSTANTS & UTILITIES
+   ═══════════════════════════════════════════════════════════════════════════ */
+// Must align with m.gates / Snowflake ETL (legacy code gates + F* / current forecast)
+const G = ['GCA','MAR','SCP1','SCP2','SCP3','F1','F2','F3','F4','CURRENTFORECAST'];
+const FULL_GATE_ORDER = ['GBL_GEO_PIVOT','GEO_STYLE','GEO_STYLE_COLOR','PRE_PROD_FINAL','POST_PROD_BRIEF','POST_PROD_ALIGN','POST_MPU-REVIEW','GCA','MAR','SCP1','SCP2','SCP3','F1','F2','F3','F4'];
+const FULL_GATE_IDX = {};FULL_GATE_ORDER.forEach((g,i)=>FULL_GATE_IDX[g]=i);
+function pickLatestGate(records,brand,seasonSet){
+  const lg={};
+  seasonSet.forEach(s=>{
+    const gs=new Set(records.filter(r=>r.s===s&&r.b===brand).map(r=>r.gt));
+    let best=-1,bestG=null;
+    gs.forEach(g=>{const idx=FULL_GATE_IDX[g];if(idx!=null&&idx>best){best=idx;bestG=g;}});
+    if(bestG)lg[s]=bestG; else if(gs.size>0)lg[s]=[...gs][0];
+  });
+  return lg;
+}
+const NIKE_SPORTS = ['Running','Training','Basketball','Global Football','Sportswear','Kids','Tennis','Golf','ACG','Skate','NikeSkims','American Football','Baseball','Specialty Sports','Cricket'];
+const NIKE_PRIMARY = ['Running','Training','Basketball','Global Football','Sportswear','Kids'];
+const JORDAN_SPORTS = ['Streetwear','Basketball','Golf','Kids','FBAT'];
+const JORDAN_FBAT = ['American Football','Global Football','Baseball','Training'];
+const FBAT_SET = new Set(JORDAN_FBAT);
+const NIKE_SPORT_MAP = {RUNNING:'Running',TRAINING:'Training',BASKETBALL:'Basketball','GLOBAL FOOTBALL':'Global Football',SPORTSWEAR:'Sportswear',TENNIS:'Tennis',GOLF:'Golf',SKATE:'Skate','AMERICAN FOOTBALL':'American Football',BASEBALL:'Baseball','SPECIALTY SPORTS':'Specialty Sports',CRICKET:'Cricket'};
+const JORDAN_SPORT_MAP = {STREETWEAR:'Streetwear',BASKETBALL:'Basketball',GOLF:'Golf','AMERICAN FOOTBALL':'American Football','GLOBAL FOOTBALL':'Global Football',BASEBALL:'Baseball',TRAINING:'Training'};
+const DIV_ORDER = ['FOOTWEAR DIVISION','APPAREL DIVISION','EQUIPMENT DIVISION'];
+const DIV_LABELS = {'FOOTWEAR DIVISION':'Footwear','APPAREL DIVISION':'Apparel','EQUIPMENT DIVISION':'Accessories'};
+const SORD = {FA:0,HO:1,SP:2,SU:3};
+
+function seasonCmp(a,b){const ya=parseInt(a.slice(2)),yb=parseInt(b.slice(2));if(ya!==yb)return ya-yb;return(SORD[a.slice(0,2)]||99)-(SORD[b.slice(0,2)]||99);}
+function priorSeason(s){const m=s.match(/^([A-Z]+)(\d{4})$/);return m?m[1]+(parseInt(m[2])-1):null;}
+function fmt(n){if(n==null||n===0)return'—';const a=Math.abs(n);const s=a>=1e9?(a/1e9).toFixed(1)+'B':a>=1e6?(a/1e6).toFixed(1)+'M':a>=1e3?(a/1e3).toFixed(0)+'K':a.toFixed(0);return(n<0?'-':'')+s;}
+const fmtU=fmt;
+function fmtD(n){if(n==null||n===0)return'—';const a=Math.abs(n);const s=a>=1e9?(a/1e9).toFixed(1)+'B':a>=1e6?(a/1e6).toFixed(1)+'M':a>=1e3?(a/1e3).toFixed(0)+'K':a.toFixed(0);return(n<0?'-':'')+'$'+s;}
+function fmtDchg(n){if(n==null||n===0)return'—';const a=Math.abs(n);const s=a>=1e9?(a/1e9).toFixed(1)+'B':(a/1e6).toFixed(1)+'M';return n>0?'<span class="pos">+$'+s+'</span>':'<span class="neg">($'+s+')</span>';}
+function pctStr(c,p){if(!p||p===0)return c?'NEW':'—';const v=((c-p)/Math.abs(p))*100;const cls=v>=0?'pos':'neg';const t=v>=0?'+'+v.toFixed(1)+'%':'('+Math.abs(v).toFixed(1)+'%)';return'<span class="'+cls+'">'+t+'</span>';}
+function pctNum(c,p){if(p==null||p===0||isNaN(p))return null;return((c-p)/Math.abs(p))*100;}
+
+/** Calendar year for season code (FA2026→2026, Ho26→2026). */
+function seasonCalendarYear(s){
+  if(!s)return 0;
+  const m=String(s).match(/^([A-Za-z]+)(\d{2,4})$/);
+  if(!m)return 0;
+  let y=parseInt(m[2],10);
+  if(y<100)y+=2000;
+  return y;
+}
+function seasonPassesCal2026(s){return seasonCalendarYear(s)>=2026;}
+
+/** Newest business season in OP + DP (matches latest Demand Plan / APO submit scope). */
+function inferDefaultOpDpSeason(d){
+  const set=new Set();
+  (d.op||[]).forEach(r=>{if(r.s)set.add(r.s);});
+  (d.dp||[]).forEach(r=>{if(r.s)set.add(r.s);});
+  const all=[...set].sort(seasonCmp);
+  return all.length?all[all.length-1]:null;
+}
+function getDefaultPreselectSeasons(d){
+  if(d.m&&d.m.default_season)return [d.m.default_season].filter(Boolean);
+  const s=inferDefaultOpDpSeason(d);
+  return s?[s]:[];
+}
+function _preselectFromDefault(allowedList){
+  if(!APP.data||!allowedList||!allowedList.length)return [];
+  return getDefaultPreselectSeasons(APP.data).filter(s=>allowedList.indexOf(s)>=0);
+}
+
+function goTab(tabName){
+  const btn=document.querySelector('#mainTabs button[data-tab="'+tabName+'"]');
+  if(btn)btn.click();
+}
+
+function nikeSport(gsf,con,sb){
+  const gu=(gsf||'').toUpperCase(),cu=(con||'').toUpperCase(),su=(sb||'').toUpperCase();
+  if(cu==='KIDS'||cu==='KID')return'Kids';
+  if(cu!=='MENS'&&cu!=='WOMENS')return null;
+  if(su.includes('ACG'))return'ACG';
+  if(su.includes('SKIMS'))return'NikeSkims';
+  if(gu==='STREETWEAR')return null;
+  return NIKE_SPORT_MAP[gu]||(gsf||'').trim()||null;
+}
+function jordanSport(gsf,con){
+  const cu=(con||'').toUpperCase(),gu=(gsf||'').toUpperCase();
+  if(cu==='KIDS'||cu==='KID')return'Kids';
+  if(cu!=='MENS'&&cu!=='WOMENS')return null;
+  if(gu==='STREETWEAR')return'Streetwear';
+  if(gu==='BASKETBALL')return'Basketball';
+  if(gu==='GOLF')return'Golf';
+  return'FBAT';
+}
+function jordanSportDetail(gsf,con){
+  const cu=(con||'').toUpperCase();
+  if(cu==='KIDS'||cu==='KID')return'Kids';
+  if(cu!=='MENS'&&cu!=='WOMENS')return null;
+  return JORDAN_SPORT_MAP[(gsf||'').toUpperCase()]||null;
+}
+function wfSport(r){
+  const cu=(r.con||'').toUpperCase(),gu=(r.gsf||'').toUpperCase(),su=(r.sb||'').toUpperCase();
+  if(cu==='KIDS'||cu==='KID')return'Kids';
+  if(cu!=='MENS'&&cu!=='WOMENS')return null;
+  if(su.includes('ACG'))return'ACG';
+  if(su.includes('SKIMS'))return'NikeSkims';
+  if(r.b==='Jordan'){const m={STREETWEAR:'Streetwear',BASKETBALL:'Basketball',GOLF:'Golf','AMERICAN FOOTBALL':'FBAT','GLOBAL FOOTBALL':'FBAT',BASEBALL:'FBAT',TRAINING:'FBAT'};return m[gu]||null;}
+  if(gu==='STREETWEAR')return null;
+  return NIKE_SPORT_MAP[gu]||null;
+}
+function spMatch(fArr,sp,brand){
+  if(!fArr||fArr.length===0)return true;
+  if(fArr.includes(sp))return true;
+  if(brand&&brand.includes('Jordan')&&fArr.includes('FBAT')&&FBAT_SET.has(sp))return true;
+  return false;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   APP STATE
+   ═══════════════════════════════════════════════════════════════════════════ */
+const APP = {
+  data: null,
+  activeTab:'exec',
+  execBrand:'Nike',
+  uifBrand:'Nike', uifMetric:'q', uifGdGrp:'fr',
+  opdpBrand:'Nike Brand',
+  sroBrand:'Nike Brand',
+  dpfrBrand:'Nike Brand', dpfrMetric:'u', dpfrTopN:10,
+  grBrand:'Nike', grMode:'ss',
+  wfBrand:'Nike', wfSeason:null, wfGeo:null, wfMetric:'w', wfTop10Mode:'fr',
+  _ms:{}
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FILTER SYSTEM (reusable multi-select)
+   ═══════════════════════════════════════════════════════════════════════════ */
+function buildFilterSet(containerId, filters, onChange){
+  const c=document.getElementById(containerId);
+  if(!c)return;
+  c.innerHTML='';
+  const prefix=containerId+'_';
+  filters.forEach(f=>{
+    const key=prefix+f.id;
+    if(!APP._ms[key])APP._ms[key]=f.preselect?[...f.preselect]:[];
+    const grp=document.createElement('div');grp.className='filter-group f-'+f.id;
+    const lbl=document.createElement('div');lbl.className='filter-label';lbl.textContent=f.label;grp.appendChild(lbl);
+    if(f.type==='select'){
+      const sel=document.createElement('select');sel.className='ms-btn';sel.id=key;
+      f.values.forEach(v=>{const o=document.createElement('option');o.value=v[0];o.textContent=v[1];if(v[0]===f.defaultVal)o.selected=true;sel.appendChild(o);});
+      sel.onchange=()=>{APP._ms[key]=[sel.value];onChange();};
+      grp.appendChild(sel);c.appendChild(grp);return;
+    }
+    const btn=document.createElement('button');btn.type='button';btn.className='ms-btn';btn.id=key+'_btn';grp.appendChild(btn);
+    const panel=document.createElement('div');panel.className='ms-panel';panel.id=key+'_panel';
+    const actions=document.createElement('div');actions.className='ms-actions';
+    const selAll=document.createElement('button');selAll.type='button';selAll.textContent='All';
+    selAll.onclick=e=>{e.stopPropagation();APP._ms[key]=[...f.values];syncP(key,f.values);onChange();};
+    const clrAll=document.createElement('button');clrAll.type='button';clrAll.textContent='None';
+    clrAll.onclick=e=>{e.stopPropagation();APP._ms[key]=[];syncP(key,f.values);onChange();};
+    actions.appendChild(selAll);actions.appendChild(clrAll);panel.appendChild(actions);
+    f.values.forEach(v=>{
+      const row=document.createElement('label');
+      const cb=document.createElement('input');cb.type='checkbox';cb.value=v;
+      cb.checked=APP._ms[key].length===0||APP._ms[key].includes(v);
+      cb.onchange=()=>{if(cb.checked){if(!APP._ms[key].includes(v))APP._ms[key].push(v);}else{if(APP._ms[key].length===0)APP._ms[key]=f.values.filter(x=>x!==v);else APP._ms[key]=APP._ms[key].filter(x=>x!==v);}updBtn(key,f.values);onChange();};
+      row.appendChild(cb);row.appendChild(document.createTextNode(v));panel.appendChild(row);
+    });
+    grp.appendChild(panel);
+    panel.addEventListener('click',e=>e.stopPropagation());
+    btn.onclick=e=>{e.stopPropagation();document.querySelectorAll('.ms-panel.open').forEach(p=>{if(p!==panel)p.classList.remove('open');});panel.classList.toggle('open');};
+    c.appendChild(grp);updBtn(key,f.values);
+  });
+}
+function syncP(key,values){const p=document.getElementById(key+'_panel');if(!p)return;p.querySelectorAll('input[type="checkbox"]').forEach(cb=>{cb.checked=APP._ms[key].includes(cb.value);});updBtn(key,values);}
+function updBtn(key,values){const btn=document.getElementById(key+'_btn');if(!btn)return;const sel=APP._ms[key];let t;if(sel.length===0||sel.length>=values.length)t='All';else if(sel.length===1)t=sel[0];else t=sel.length+' selected';btn.innerHTML='<span style="overflow:hidden;text-overflow:ellipsis">'+t+'</span><span class="arrow">\u25BC</span>';}
+function getF(containerId,id){const key=containerId+'_'+id;const arr=APP._ms[key]||[];return arr;}
+function getFSet(containerId,id){const arr=getF(containerId,id);return arr.length>0?new Set(arr):null;}
+document.addEventListener('click',()=>{document.querySelectorAll('.ms-panel.open').forEach(p=>p.classList.remove('open'));});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TAB SWITCHING
+   ═══════════════════════════════════════════════════════════════════════════ */
+document.querySelectorAll('#mainTabs button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const tab=btn.dataset.tab;
+    APP.activeTab=tab;
+    document.querySelectorAll('#mainTabs button').forEach(b=>b.classList.toggle('active',b===btn));
+    document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===tab+'View'));
+    try{({exec:initExec,uif:initUif,opdp:initOpdp,sro:initSro,dpfr:initDpfr,gr:initGr,wf:initWf})[tab]();}
+    catch(err){console.error('Tab init error ['+tab+']:',err);}
+    if(typeof syncExecWcModuleButtons==='function')syncExecWcModuleButtons();
+  });
+});
+function setupBrandBtns(selector,setter,initFn){
+  document.querySelectorAll(selector).forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      setter(btn);
+      document.querySelectorAll(selector).forEach(b=>b.classList.toggle('active',b===btn));
+      initFn();
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AI INSIGHTS — data-driven executive callout builder
+   ═══════════════════════════════════════════════════════════════════════════ */
+const _AI_SVG='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FE5000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 014 4c0 1.1-.9 2-2 2h-4a2 2 0 01-2-2 4 4 0 014-4z"/><path d="M8 8v8"/><path d="M16 8v8"/><path d="M6 16h12a2 2 0 012 2v2H4v-2a2 2 0 012-2z"/><path d="M12 8v8"/></svg>';
+function _aiWrap(items,note){
+  if(!items||items.length===0)return'';
+  let h='<div class="ai-insights-hdr">'+_AI_SVG+'<span>AI Insights</span></div><ul>';
+  items.forEach(li=>h+='<li>'+li+'</li>');
+  h+='</ul>';
+  if(note)h+='<div class="ai-note">'+note+'</div>';
+  return h;
+}
+function _aiFmtPct(v){if(v==null||isNaN(v))return'—';const s=v>=0?'+':'';return s+v.toFixed(1)+'%';}
+function _aiFmtVal(v,dollar){if(!v||v===0)return'—';const a=Math.abs(v);const f=a>=1e9?(a/1e9).toFixed(1)+'B':a>=1e6?(a/1e6).toFixed(1)+'M':a>=1e3?(a/1e3).toFixed(0)+'K':a.toFixed(0);return(v<0?'-':'')+(dollar?'$':'')+f;}
+function _aiPctCls(v){return v>=0?'ai-pos':'ai-neg';}
+function _aiHL(txt){return'<span class="ai-highlight">'+txt+'</span>';}
+function _aiPct(v){const cls=v>=0?'ai-pos':'ai-neg';return'<span class="'+cls+'">'+_aiFmtPct(v)+'</span>';}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UIF TAB
+   ═══════════════════════════════════════════════════════════════════════════ */
+var _uifInited=false;
+function initUif(){
+  const d=APP.data;if(!d)return;
+  const brand=APP.uifBrand;
+  const opts=d.uo[brand]||{};
+  const sportList=brand==='Nike'?(opts.sport||NIKE_SPORTS):(opts.sport||JORDAN_SPORTS);
+  const uifSeasonPre=_preselectFromDefault(opts.season||[]);
+  buildFilterSet('uifFilters',[
+    {id:'season',label:'Season',values:opts.season||[],preselect:uifSeasonPre.length?uifSeasonPre:(opts.season||[]).filter(s=>/202[5-7]/.test(s))},
+    {id:'geo',label:'Geo',values:opts.geo||[],preselect:[]},
+    {id:'division',label:'Product Engine',values:opts.division||[],preselect:[]},
+    {id:'sub_brand',label:'Sub Brand',values:opts.sub_brand||[],preselect:[]},
+    {id:'sport',label:'Sport',values:sportList,preselect:[]},
+    {id:'pf',label:'PDD Family',values:opts.pf||[],preselect:[]},
+    {id:'psf',label:'PDD Sub Family',values:opts.psf||[],preselect:[]},
+    {id:'bnb',label:'Branded / Non-Branded',values:opts.bnb||[],preselect:[]},
+    {id:'metric',label:'Metric',type:'select',values:[['q','DP Quantity'],['w','Dollars']],defaultVal:APP.uifMetric},
+    {id:'gd',label:'G&D Apparel By',type:'select',values:[['fr','Franchise'],['mc','Merch Class']],defaultVal:APP.uifGdGrp},
+  ],renderUif);
+  _uifInited=true;
+  renderUif();
+}
+function renderUif(){
+  const d=APP.data;if(!d)return;
+  const D=d.u,brand=APP.uifBrand;
+  const metSel=document.getElementById('uifFilters_metric');
+  if(metSel)APP.uifMetric=metSel.value;
+  const gdSel=document.getElementById('uifFilters_gd');
+  if(gdSel)APP.uifGdGrp=gdSel.value;
+  const METRIC=APP.uifMetric;
+  const fSn=getFSet('uifFilters','season'),fGe=getFSet('uifFilters','geo'),fDv=getFSet('uifFilters','division');
+  const fSb=getFSet('uifFilters','sub_brand'),fSp=getF('uifFilters','sport');
+  const fPf=getFSet('uifFilters','pf'),fPsf=getFSet('uifFilters','psf'),fBnb=getFSet('uifFilters','bnb');
+
+  function matchSport(r){
+    if(!fSp||fSp.length===0)return true;
+    if(brand==='Nike'){const sp=nikeSport(r.gsf,r.con,r.sb);return fSp.includes(sp);}
+    else{const sp=jordanSport(r.gsf,r.con);if(!sp)return false;if(fSp.includes(sp))return true;if(fSp.includes('FBAT')&&FBAT_SET.has(jordanSportDetail(r.gsf,r.con)))return true;return false;}
+  }
+  function match(r,skipSeason){
+    if(r.b!==brand)return false;
+    if(!skipSeason&&fSn&&!fSn.has(r.s))return false;
+    if(fGe&&!fGe.has(r.geo))return false;
+    if(fDv){const dKey=r.d||r.div;if(!fDv.has(dKey))return false;}
+    if(fSb&&!fSb.has(r.sb))return false;
+    if(!matchSport(r))return false;
+    if(fPf&&!fPf.has(r.pf))return false;
+    if(fPsf&&!fPsf.has(r.psf))return false;
+    if(fBnb&&!fBnb.has(r.bnb))return false;
+    return true;
+  }
+
+  const rows=D.filter(r=>r.g!=='LY'&&match(r,false));
+  const seasons=fSn?[...fSn].sort(seasonCmp):(APP.data.uo[brand]||{}).season||[];
+  const pys=new Set();seasons.forEach(s=>{const p=priorSeason(s);if(p)pys.add(p);});
+  const lyRows=D.filter(r=>r.g==='LY'&&pys.has(r.s)&&match(r,true));
+
+  // Sum by gate
+  const byGate={};G.forEach(g=>byGate[g]=0);byGate['LY']=0;
+  rows.forEach(r=>{if(byGate.hasOwnProperty(r.g))byGate[r.g]+=r[METRIC];});
+  lyRows.forEach(r=>{byGate['LY']+=r[METRIC];});
+
+  // AI Insights
+  (function(){
+    const el=document.getElementById('uifAiInsights');if(!el)return;
+    const items=[];const isDollar=METRIC==='w';const metLabel=isDollar?'WHS $':'DP Qty';
+    const ly=byGate['LY'],latest=byGate[G[G.length-1]]||byGate[G[G.length-2]];
+    const gca=byGate['GCA'],scp3=byGate['SCP3']||0,mar=byGate['MAR']||0;
+    if(latest&&ly&&ly>0){const chg=((latest-ly)/Math.abs(ly))*100;items.push('Current plan '+metLabel+' is at '+_aiHL(_aiFmtVal(latest,isDollar))+', '+_aiPct(chg)+' vs. Last Year across selected seasons.');}
+    else if(latest){items.push('Current plan '+metLabel+' stands at '+_aiHL(_aiFmtVal(latest,isDollar))+' across selected seasons.');}
+    if(gca&&scp3&&gca>0){const drift=((scp3-gca)/Math.abs(gca))*100;const dir=drift>=0?'increased':'decreased';items.push('Unit flow has '+_aiHL(dir)+' '+_aiPct(drift)+' from GCA to SCP3, signaling '+(Math.abs(drift)>5?'notable':'modest')+' demand movement through the planning cycle.');}
+    if(mar&&scp3&&mar>0){const drift=((scp3-mar)/Math.abs(mar))*100;if(Math.abs(drift)>3)items.push('SCP3 vs MAR gate shift of '+_aiPct(drift)+' — '+(drift>0?'upside momentum since marketplace':'plan tightened post-marketplace')+'.');}
+    if(items.length===0)items.push('Select seasons and filters above to surface demand plan flow insights.');
+    el.innerHTML=_aiWrap(items,'Insights are computed from filtered data in real time.');
+  })();
+
+  // Gate flow chart
+  const vals=G.map(g=>byGate[g]||0);
+  const valid=vals.filter(v=>v>0);
+  const yMin=valid.length?Math.max(0,Math.min(...valid)*0.92):0;
+  const yMax=valid.length?Math.max(...valid)*1.08:1e8;
+  const traces=[{x:G.slice(0,2),y:vals.slice(0,2),type:'scatter',mode:'lines+markers+text',text:vals.slice(0,2).map(v=>v?fmt(v):'—'),textposition:'top center',textfont:{size:12,color:'#222',weight:700},line:{color:'#000',width:3,shape:'spline',smoothing:1.2},marker:{size:10,color:'#000'},connectgaps:true,showlegend:false},
+    {x:G.slice(1),y:vals.slice(1),type:'scatter',mode:'lines+markers+text',text:vals.slice(1).map((v,i)=>i===0?'':v?fmt(v):'—'),textposition:'top center',textfont:{size:12,color:'#222',weight:700},line:{color:'#EC3E15',width:3,dash:'dot',shape:'spline',smoothing:1.2},marker:{size:10,color:G.slice(1).map((_,i)=>i===0?'#000':'#EC3E15')},connectgaps:true,showlegend:false}];
+  Plotly.react('uifChart',traces,{paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{family:"'Helvetica Neue',Helvetica,Arial,sans-serif",color:'#222',size:12},margin:{t:50,r:40,b:50,l:80},xaxis:{showgrid:false,zeroline:false,categoryorder:'array',categoryarray:G,tickfont:{weight:700,size:12}},yaxis:{showgrid:false,zeroline:false,tickformat:',.0f',range:[yMin,yMax],showticklabels:false},showlegend:false,autosize:true},{responsive:true,displayModeBar:false});
+
+  // Sport table
+  const allSports=brand==='Nike'?NIKE_SPORTS:JORDAN_SPORTS;
+  const mkG=()=>{const o={};G.forEach(g=>o[g]=0);o['LY']=0;return o;};
+  const sportData={};allSports.forEach(sp=>sportData[sp]=mkG());
+  const fbatDetail={};JORDAN_FBAT.forEach(d=>fbatDetail[d]=mkG());
+
+  function addRow(r){
+    if(brand==='Nike'){
+      const sp=nikeSport(r.gsf,r.con,r.sb);
+      const grp=NIKE_PRIMARY.includes(sp)?sp:(sp?'All Other Sports':null);
+      if(!grp)return;
+      if(!sportData[grp])sportData[grp]=mkG();
+      if(sportData[grp].hasOwnProperty(r.g))sportData[grp][r.g]+=r[METRIC];
+    }else{
+      const sp=jordanSportDetail(r.gsf,r.con);
+      if(!sp)return;
+      if(FBAT_SET.has(sp)){
+        if(sportData['FBAT']&&sportData['FBAT'].hasOwnProperty(r.g))sportData['FBAT'][r.g]+=r[METRIC];
+        if(!fbatDetail[sp])fbatDetail[sp]=mkG();
+        if(fbatDetail[sp].hasOwnProperty(r.g))fbatDetail[sp][r.g]+=r[METRIC];
+      }else{
+        if(sportData[sp]&&sportData[sp].hasOwnProperty(r.g))sportData[sp][r.g]+=r[METRIC];
+      }
+    }
+  }
+  rows.forEach(addRow);lyRows.forEach(r=>addRow({...r,g:'LY'}));
+
+  const prev={GCA:null,MAR:'GCA',SCP1:'MAR',SCP2:'SCP1',SCP3:'SCP2'};
+  function gateCells(v){let h='';G.forEach(g=>{h+='<td>'+fmt(v[g])+'</td>';if(prev[g])h+='<td>'+pctStr(v[g],v[prev[g]])+'</td>';h+='<td>'+pctStr(v[g],v['LY'])+'</td>';});return h;}
+
+  const mLabel=METRIC==='w'?'WHS$':'Unit Investment';
+  let t='<table class="dt"><thead><tr><th></th>';
+  t+='<th colspan="2">GCA</th><th colspan="3">MAR</th><th colspan="3">SCP1</th><th colspan="3">SCP2</th><th colspan="3">SCP3</th></tr>';
+  t+='<tr><th></th><th>'+mLabel+'</th><th>v PY</th><th>'+mLabel+'</th><th>v GCA</th><th>v PY</th><th>'+mLabel+'</th><th>v MAR</th><th>v PY</th><th>'+mLabel+'</th><th>v SCP1</th><th>v PY</th><th>'+mLabel+'</th><th>v SCP2</th><th>v PY</th></tr></thead><tbody>';
+  const brandLabel=brand==='Nike'?'Total Nike Brand':'Total Jordan Brand';
+  t+='<tr class="total-row"><td>'+brandLabel+'</td>'+gateCells(byGate)+'</tr>';
+  allSports.forEach(sp=>{if(!sportData[sp])return;const hasData=G.some(g=>(sportData[sp][g]||0)>0)||(sportData[sp]['LY']||0)>0;if(hasData)t+='<tr><td>'+sp+'</td>'+gateCells(sportData[sp])+'</tr>';});
+  if(brand!=='Nike'){
+    t+='<tr class="detail-header"><td colspan="15">FBAT Detail</td></tr>';
+    JORDAN_FBAT.forEach(d=>{if(!fbatDetail[d])return;const hasData=G.some(g=>(fbatDetail[d][g]||0)>0)||(fbatDetail[d]['LY']||0)>0;if(hasData)t+='<tr class="detail-row"><td>'+d+'</td>'+gateCells(fbatDetail[d])+'</tr>';});
+  }
+  t+='</tbody></table>';
+  document.getElementById('uifTableWrap').innerHTML=t;
+
+  // Gainer & Drainer
+  const tyGate=(()=>{for(let i=G.length-1;i>=0;i--)if(rows.some(r=>r.g===G[i]))return G[i];return'SCP1';})();
+  const byDiv={};DIV_ORDER.forEach(d=>byDiv[d]={});
+  function gdKey(r){if(r.div==='APPAREL DIVISION'&&APP.uifGdGrp==='mc')return r.mc||'(Unknown)';return r.fr||'(Unknown)';}
+  rows.filter(r=>r.g===tyGate).forEach(r=>{const div=r.div||'';if(!byDiv[div])return;const fr=gdKey(r);if(!byDiv[div][fr])byDiv[div][fr]={cur:0,ly:0};byDiv[div][fr].cur+=r.w;});
+  lyRows.forEach(r=>{const div=r.div||'';if(!byDiv[div])return;const fr=gdKey(r);if(!byDiv[div][fr])byDiv[div][fr]={cur:0,ly:0};byDiv[div][fr].ly+=r.w;});
+
+  document.querySelector('.gd-section h2').textContent='Gainer & Drainer — GLB WHS $ ('+tyGate+' v LY)';
+  let gdH='';
+  DIV_ORDER.forEach(div=>{
+    const frs=byDiv[div];
+    const entries=Object.entries(frs).map(([fr,v])=>({fr,cur:v.cur,ly:v.ly,chg:v.cur-v.ly})).filter(x=>x.cur||x.ly);
+    function isExcl(fr){const u=(fr||'').toUpperCase();return u==='*UNK*'||u==='NO FRANCHISE'||u==='NOT APPLICABLE';}
+    const gainers=entries.filter(x=>x.chg>0).sort((a,b)=>b.chg-a.chg);
+    const drainers=entries.filter(x=>x.chg<0).sort((a,b)=>a.chg-b.chg);
+    const flat=entries.filter(x=>x.chg===0);
+    const topN=div==='EQUIPMENT DIVISION'?5:10;
+    const rG=gainers.filter(x=>!isExcl(x.fr)),eG=gainers.filter(x=>isExcl(x.fr));
+    const t10g=rG.slice(0,topN),restG=rG.slice(topN).concat(eG);
+    const rD=drainers.filter(x=>!isExcl(x.fr)),eD=drainers.filter(x=>isExcl(x.fr));
+    const t10d=rD.slice(0,topN),restD=rD.slice(topN).concat(eD);
+    const oGC=restG.reduce((s,x)=>s+x.cur,0)+flat.reduce((s,x)=>s+x.cur,0);
+    const oGL=restG.reduce((s,x)=>s+x.ly,0)+flat.reduce((s,x)=>s+x.ly,0);
+    const tGC=gainers.reduce((s,x)=>s+x.cur,0)+flat.reduce((s,x)=>s+x.cur,0);
+    const tGL=gainers.reduce((s,x)=>s+x.ly,0)+flat.reduce((s,x)=>s+x.ly,0);
+    const oDC=restD.reduce((s,x)=>s+x.cur,0),oDL=restD.reduce((s,x)=>s+x.ly,0);
+    const tDC=drainers.reduce((s,x)=>s+x.cur,0),tDL=drainers.reduce((s,x)=>s+x.ly,0);
+    const dC=entries.reduce((s,x)=>s+x.cur,0),dL=entries.reduce((s,x)=>s+x.ly,0);
+    function sob(cur){return dC?((cur/dC)*100).toFixed(1)+'%':'—';}
+    function row(rank,fr,cur,chg,ly,cls){return'<tr class="'+(cls||'')+'"><td>'+rank+'</td><td>'+fr+'</td><td>'+fmtD(cur)+'</td><td>'+fmtDchg(chg)+'</td><td>'+pctStr(cur,ly)+'</td><td>'+sob(cur)+'</td></tr>';}
+    let h='<div class="gd-div"><h3>'+(DIV_LABELS[div]||div)+'</h3>';
+    h+='<table class="gd"><thead><tr class="gh"><th class="gh">#</th><th class="gh">Top '+topN+' Gainers</th><th class="gh">'+tyGate+' WHS$</th><th class="gh">$ Chg</th><th class="gh">% Chg</th><th class="gh">SOB</th></tr></thead><tbody>';
+    t10g.forEach((x,i)=>h+=row(i+1,x.fr,x.cur,x.chg,x.ly,''));
+    if(restG.length||flat.length)h+=row('','All Other Gainers',oGC,oGC-oGL,oGL,'gd-allother');
+    h+=row('','Total Gainers',tGC,tGC-tGL,tGL,'gd-subtotal');
+    h+='</tbody></table>';
+    h+='<table class="gd"><thead><tr class="dh"><th class="dh">#</th><th class="dh">Top '+topN+' Drainers</th><th class="dh">'+tyGate+' WHS$</th><th class="dh">$ Chg</th><th class="dh">% Chg</th><th class="dh">SOB</th></tr></thead><tbody>';
+    t10d.forEach((x,i)=>h+=row(i+1,x.fr,x.cur,x.chg,x.ly,''));
+    if(restD.length)h+=row('','All Other Drainers',oDC,oDC-oDL,oDL,'gd-allother');
+    h+=row('','Total Drainers',tDC,tDC-tDL,tDL,'gd-subtotal');
+    h+='</tbody></table>';
+    h+=row('','Total '+(DIV_LABELS[div]||div),dC,dC-dL,dL,'gd-divtotal');
+    h+='</div>';
+    gdH+=h;
+  });
+  document.getElementById('gdWrap').innerHTML=gdH;
+}
+setupBrandBtns('[data-uif-brand]',btn=>{APP.uifBrand=btn.dataset.uifBrand;},initUif);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OPDP TAB
+   ═══════════════════════════════════════════════════════════════════════════ */
+function initOpdp(){
+  const d=APP.data;if(!d)return;
+  const brand=APP.opdpBrand;
+  const oo=d.oo||{};
+  const jordanSports=brand.includes('Jordan');
+  const bSports=(oo.sports||[]).filter(sp=>{
+    if(jordanSports)return['Kids','Streetwear','Basketball','Golf','FBAT','American Football','Global Football','Baseball','Training'].includes(sp);
+    return!['Streetwear'].includes(sp);
+  });
+  const opdpP=_preselectFromDefault(oo.seasons||[]);
+  buildFilterSet('opdpFilters',[
+    {id:'season',label:'Season',values:oo.seasons||[],preselect:opdpP},
+    {id:'geo',label:'Geo',values:oo.geos||[],preselect:[]},
+    {id:'div',label:'Division',values:oo.divs||[],preselect:[]},
+    {id:'sb',label:'Sub Brand',values:oo.sub_brands||[],preselect:[]},
+    {id:'sport',label:'Sport',values:bSports,preselect:[]},
+    {id:'con',label:'Consumer',values:oo.consumers||[],preselect:[]},
+  ],renderOpdp);
+  renderOpdp();
+}
+function renderOpdp(){
+  const d=APP.data;if(!d)return;
+  const brand=APP.opdpBrand;
+  const OP=d.op||[],DP=d.dp||[];
+  const fSn=getFSet('opdpFilters','season'),fGe=getFSet('opdpFilters','geo'),fDv=getFSet('opdpFilters','div');
+  const fSb=getFSet('opdpFilters','sb'),fSp=getF('opdpFilters','sport'),fCo=getFSet('opdpFilters','con');
+
+  function matchOp(r){
+    if(r.b!==brand)return false;
+    if(fSn&&!fSn.has(r.s))return false;
+    if(fGe&&!fGe.has(r.g))return false;
+    if(fDv&&!fDv.has(r.d))return false;
+    if(fSb&&!fSb.has(r.sb))return false;
+    if(!spMatch(fSp,r.msp,brand))return false;
+    if(fCo&&!fCo.has(r.con))return false;
+    return true;
+  }
+
+  // Latest gate per season for DP — pick highest gate that has non-zero data
+  const dpSeasons=new Set(DP.filter(r=>r.b===brand).map(r=>r.s));
+  const latestGate=(function(){
+    const lg={};
+    dpSeasons.forEach(s=>{
+      const gatesWithData=new Set();
+      const gatesAny=new Set();
+      DP.forEach(r=>{if(r.s===s&&r.b===brand){gatesAny.add(r.gt);if((r.adp||0)!==0||(r.afpd||0)!==0)gatesWithData.add(r.gt);}});
+      const pool=gatesWithData.size>0?gatesWithData:gatesAny;
+      let best=-1,bestG=null;
+      pool.forEach(g=>{const idx=FULL_GATE_IDX[g];if(idx!=null&&idx>best){best=idx;bestG=g;}});
+      if(bestG)lg[s]=bestG;else if(pool.size>0)lg[s]=[...pool][0];
+    });
+    return lg;
+  })();
+  function matchDp(r){
+    if(r.b!==brand)return false;
+    if(fSn&&!fSn.has(r.s))return false;
+    if(latestGate[r.s]!==r.gt)return false;
+    if(fGe&&!fGe.has(r.g))return false;
+    if(fDv&&!fDv.has(r.d))return false;
+    if(fSb&&!fSb.has(r.sb))return false;
+    if(!spMatch(fSp,r.msp,brand))return false;
+    return true;
+  }
+  function matchDpForSeasonGate(r,season,gate){
+    if(r.b!==brand)return false;
+    if(r.s!==season)return false;
+    if(r.gt!==gate)return false;
+    if(fGe&&!fGe.has(r.g))return false;
+    if(fDv&&!fDv.has(r.d))return false;
+    if(fSb&&!fSb.has(r.sb))return false;
+    if(!spMatch(fSp,r.msp,brand))return false;
+    if(fCo&&!fCo.has(r.con))return false;
+    return true;
+  }
+
+  const fOP=OP.filter(matchOp);
+  const fDP=DP.filter(matchDp);
+
+  // Quick diagnostic — show DP data status
+  const _dsEl=document.getElementById('opdpDataStatus');
+  if(_dsEl){
+    const _src=(APP.data.m||{}).src||'unknown';
+    const _dpTotal=DP.length;const _dpBrand=DP.filter(r=>r.b===brand).length;
+    const _fDPlen=fDP.length;const _sumAdp=fDP.reduce((s,r)=>s+(r.adp||0),0);
+    const _lgKeys=Object.keys(latestGate).join(',');
+    _dsEl.innerHTML='<div style="background:#f0f9ff;padding:6px 12px;border-radius:6px;font-size:0.7rem;color:#555;margin:4px 0;">'
+      +'<b>Data:</b> src='+_src+' | DP total='+_dpTotal+' | DP brand('+brand+')='+_dpBrand+' | filtered='+_fDPlen+' | SUM adp='+_sumAdp.toLocaleString()
+      +' | latestGate={'+_lgKeys+'}'
+      +'</div>';
+  }
+
+  // Build PY DP data: prefer F4, fall back to latest available gate
+  const selectedSeasons=fSn?[...fSn]:([...new Set(OP.concat(DP).map(r=>r.s))]);
+  const allDpSeasons=new Set(DP.filter(r=>r.b===brand).map(r=>r.s));
+  const latestGateAll=pickLatestGate(DP,brand,allDpSeasons);
+  const dpPyBySeason={};
+  selectedSeasons.forEach(s=>{
+    const ps=priorSeason(s);
+    if(!ps)return;
+    const hasF4=DP.some(r=>r.b===brand&&r.s===ps&&r.gt==='F4');
+    const pyGate=hasF4?'F4':(latestGateAll[ps]||null);
+    if(!pyGate)return;
+    const pyRecs=DP.filter(r=>matchDpForSeasonGate(r,ps,pyGate));
+    dpPyBySeason[s]=pyRecs;
+  });
+  const fDPpy=[];
+  selectedSeasons.forEach(s=>{if(dpPyBySeason[s])dpPyBySeason[s].forEach(r=>fDPpy.push(r));});
+
+  const metrics=[
+    {key:'SR',label:'SR',f:'sr',fP:'srP',dollar:true,src:'op'},
+    {key:'RSV',label:'RSV',f:'rsv',fP:'rsvP',dollar:true,src:'op'},
+    {key:'DP',label:'GF+AA+AO Units',f:'dp',fP:'dpP',dollar:false,src:'op'},
+    {key:'FPD',label:'GF+AA+AO $',f:'fpd',fP:'fpdP',dollar:true,src:'op'},
+    {key:'ADP',label:'APO Unit Investment',f:'adp',fP:'adp',dollar:false,src:'dp'},
+    {key:'AFPD',label:'APO FPD$',f:'afpd',fP:'afpd',dollar:true,src:'dp'},
+  ];
+
+  // Scorecard
+  let cards='';
+  metrics.slice(0,4).forEach(m=>{
+    const ty=fOP.reduce((s,r)=>s+(r[m.f]||0),0);
+    const py=fOP.reduce((s,r)=>s+(r[m.fP]||0),0);
+    cards+='<div class="card"><div class="c-label">'+m.label+'</div><div class="c-value">'+(m.dollar?fmtD(ty):fmt(ty))+'</div><div style="font-size:0.72rem;">'+pctStr(ty,py)+'</div></div>';
+  });
+  document.getElementById('opdpCards').innerHTML=cards;
+
+  // AI Insights
+  (function(){
+    const el=document.getElementById('opdpAiInsights');if(!el)return;
+    const items=[];const bName=brand.includes('Jordan')?'Jordan':'Nike';
+    const sr=fOP.reduce((s,r)=>s+(r.sr||0),0),srP=fOP.reduce((s,r)=>s+(r.srP||0),0);
+    const dp=fOP.reduce((s,r)=>s+(r.dp||0),0),dpP=fOP.reduce((s,r)=>s+(r.dpP||0),0);
+    const adp=fDP.reduce((s,r)=>s+(r.adp||0),0);
+    const adpPy=fDPpy.reduce((s,r)=>s+(r.adp||0),0);
+    if(sr&&srP&&srP>0){const chg=((sr-srP)/Math.abs(srP))*100;items.push(bName+' Seasonal Revenue is '+_aiHL(_aiFmtVal(sr,true))+', '+_aiPct(chg)+' vs PY. '+(chg<-3?'Revenue pressure warrants attention.':chg>5?'Strong revenue momentum across selected seasons.':'Tracking in-line with prior year.'));}
+    if(dp&&dpP&&dpP>0){const chg=((dp-dpP)/Math.abs(dpP))*100;items.push('GF+AA+AO Units at '+_aiHL(_aiFmtVal(dp,false))+' ('+_aiPct(chg)+' vs PY) — '+(chg<0?'unit contraction may signal tighter buys or distribution shifts.':'positive unit growth supports marketplace health.'));}
+    if(adp&&adpPy&&adpPy>0){const chg=((adp-adpPy)/Math.abs(adpPy))*100;items.push('APO Unit Investment is '+_aiPct(chg)+' vs prior season F4, indicating '+(chg>0?'increased':'reduced')+' demand plan commitment.');}
+    else if(adp){items.push('APO Unit Investment totals '+_aiHL(_aiFmtVal(adp,false))+' units across selected seasons.');}
+    if(items.length===0)items.push('Select seasons and filters to view OP + Unit Investment insights.');
+    el.innerHTML=_aiWrap(items,'Comparing current OP Submit metrics against PY; APO rows compared against prior season F4 (or latest available gate).');
+  })();
+
+  // Build column structure with category headers
+  const bLbl=brand.includes('Jordan')?'Total Jordan<br>Brand':'Total Nike<br>Brand';
+  const colGroups=[
+    {cat:'',cols:[{h:bLbl,filter:r=>true}]},
+    {cat:'Geo',cols:['NA','EMEA','GC','APLA'].map(g=>({h:g,filter:r=>r.g===g||r.geo===g}))},
+    {cat:'PE',cols:['FW','AP','ACC'].map(d=>({h:d,filter:r=>r.d===d||r.dv===d}))},
+    {cat:'Consumer',cols:['Mens','Womens'].map(c=>({h:c,filter:r=>r.con===c}))},
+    {cat:'Channel',cols:[
+      {h:'Total Nike<br>Direct',filter:r=>r.ch==='NDDC'||r.ch==='NSO'||r.ch==='NVS'},
+      {h:'NDDC',filter:r=>r.ch==='NDDC'},
+      {h:'NSO',filter:r=>r.ch==='NSO'},
+      {h:'NVS',filter:r=>r.ch==='NVS'},
+      {h:'Total 3PW',filter:r=>r.ch==='NSP'||r.ch==='NMP'},
+      {h:'NSP',filter:r=>r.ch==='NSP'},
+      {h:'NMP',filter:r=>r.ch==='NMP'},
+    ]},
+  ];
+
+  let t='<table class="dt"><thead>';
+  // Category header row
+  t+='<tr><th rowspan="2"></th>';
+  colGroups.forEach(cg=>{
+    const span=cg.cols.length*2;
+    if(cg.cat)t+='<th colspan="'+span+'" style="text-align:center;font-weight:700;border-bottom:2px solid var(--gray-300);font-size:0.82rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--gray-600);">'+cg.cat+'</th>';
+    else t+='<th colspan="'+span+'"></th>';
+  });
+  t+='</tr>';
+  // Column header row
+  t+='<tr>';
+  colGroups.forEach(cg=>{cg.cols.forEach(c=>t+='<th>'+c.h+'</th><th>% v PY</th>');});
+  t+='</tr></thead><tbody>';
+
+  metrics.forEach(m=>{
+    const src=m.src==='op'?fOP:fDP;
+    const pySrc=m.src==='dp'?fDPpy:null;
+    t+='<tr><td>'+m.label+'</td>';
+    colGroups.forEach(cg=>{cg.cols.forEach(c=>{
+      const sub=src.filter(c.filter);
+      const ty=sub.reduce((s,r)=>s+(r[m.f]||0),0);
+      let py=0;
+      if(pySrc){
+        py=pySrc.filter(c.filter).reduce((s,r)=>s+(r[m.fP]||0),0);
+      }else if(m.fP){
+        py=sub.reduce((s,r)=>s+(r[m.fP]||0),0);
+      }
+      const hasPy=pySrc?(py!==0):!!m.fP;
+      t+='<td>'+(m.dollar?fmtD(ty):fmt(ty))+'</td><td>'+(hasPy?pctStr(ty,py):'—')+'</td>';
+    });});
+    t+='</tr>';
+  });
+  t+='</tbody></table>';
+  document.getElementById('opdpTableWrap').innerHTML=t;
+}
+setupBrandBtns('[data-opdp-brand]',btn=>{APP.opdpBrand=btn.dataset.opdpBrand;},initOpdp);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SRO TAB
+   ═══════════════════════════════════════════════════════════════════════════ */
+function initSro(){
+  const d=APP.data;if(!d)return;
+  const brand=APP.sroBrand;
+  const so=d.so||{};
+  const jordanB=brand.includes('Jordan');
+  const bSports=(so.sports||[]).filter(sp=>{
+    if(jordanB)return['Kids','Streetwear','Basketball','Golf','FBAT','American Football','Global Football','Baseball','Training'].includes(sp);
+    return!['Streetwear'].includes(sp);
+  });
+  const sroP=_preselectFromDefault(so.seasons||[]);
+  buildFilterSet('sroFilters',[
+    {id:'season',label:'Season',values:so.seasons||[],preselect:sroP},
+    {id:'geo',label:'Geo',values:so.geos||[],preselect:[]},
+    {id:'div',label:'Division',values:so.divs||[],preselect:[]},
+    {id:'sb',label:'Sub Brand',values:so.sub_brands||[],preselect:[]},
+    {id:'sport',label:'Sport',values:bSports,preselect:[]},
+  ],renderSro);
+  renderSro();
+}
+function renderSro(){
+  const d=APP.data;if(!d)return;
+  const brand=APP.sroBrand;
+  const SRO=d.sro||[];
+  const fSn=getFSet('sroFilters','season'),fGe=getFSet('sroFilters','geo'),fDv=getFSet('sroFilters','div');
+  const fSb=getFSet('sroFilters','sb'),fSp=getF('sroFilters','sport');
+
+  function matchRow(r){
+    if(r.b!==brand)return false;
+    if(fSn&&!fSn.has(r.s))return false;
+    if(fGe&&!fGe.has(r.g))return false;
+    if(fDv&&!fDv.has(r.d))return false;
+    if(fSb&&!fSb.has(r.sb))return false;
+    if(!spMatch(fSp,r.msp,brand))return false;
+    return true;
+  }
+
+  const filtered=SRO.filter(matchRow);
+  const jordanB=brand.includes('Jordan');
+  const sportOrder=jordanB?['Streetwear','Basketball','Golf','Kids','FBAT']:
+    ['Running','Training','Basketball','Global Football','Sportswear','Kids','Tennis','Golf','ACG','Skate','NikeSkims','American Football','Baseball','Specialty Sports','Cricket','Other'];
+
+  // Accumulate by sport × column group
+  const acc={};
+  function addTo(sport,group,sr,srP){
+    if(!acc[sport])acc[sport]={};
+    if(!acc[sport][group])acc[sport][group]={ty:0,py:0};
+    acc[sport][group].ty+=sr;acc[sport][group].py+=srP;
+  }
+
+  filtered.forEach(r=>{
+    const sp=r.msp;
+    addTo(sp,'total',r.sr,r.srP);
+    if(r.g)addTo(sp,'geo_'+r.g,r.sr,r.srP);
+    if(r.d)addTo(sp,'div_'+r.d,r.sr,r.srP);
+    if(r.con)addTo(sp,'con_'+r.con,r.sr,r.srP);
+    if(r.ch)addTo(sp,'chan_'+r.ch,r.sr,r.srP);
+    // FBAT rollup for Jordan
+    if(jordanB&&FBAT_SET.has(sp)){
+      addTo('FBAT','total',r.sr,r.srP);
+      if(r.g)addTo('FBAT','geo_'+r.g,r.sr,r.srP);
+      if(r.d)addTo('FBAT','div_'+r.d,r.sr,r.srP);
+      if(r.con)addTo('FBAT','con_'+r.con,r.sr,r.srP);
+      if(r.ch)addTo('FBAT','chan_'+r.ch,r.sr,r.srP);
+    }
+  });
+
+  // Column headers
+  const bLbl=brand.includes('Jordan')?'Total Jordan<br>Brand':'Total Nike<br>Brand';
+  const geoOrder=['NA','EMEA','GC','APLA'];
+  const divOrder=['FW','AP','ACC'];
+  const conOrder=['MENS','WOMENS','KIDS'];
+  const chOrder=['NDDC','NSO','NVS','NSP','NMP'];
+  const colGroups=[{h:bLbl,keys:['total']},{h:'Geo',keys:geoOrder.map(g=>'geo_'+g)},{h:'Division',keys:divOrder.map(d=>'div_'+d)},{h:'Consumer',keys:conOrder.map(c=>'con_'+c)},{h:'Channel',keys:chOrder.map(c=>'chan_'+c)}];
+
+  let t='<table class="dt"><thead><tr><th></th>';
+  colGroups.forEach(cg=>{cg.keys.forEach(k=>t+='<th colspan="2">'+k.replace(/^(geo_|div_|con_|chan_)/,'').replace('total',bLbl)+'</th>');});
+  t+='</tr></thead><tbody>';
+
+  // Total row
+  const allSports=Object.keys(acc);
+  const totalAcc={};
+  allSports.filter(sp=>!FBAT_SET.has(sp)||!jordanB).forEach(sp=>{
+    Object.entries(acc[sp]||{}).forEach(([k,v])=>{if(!totalAcc[k])totalAcc[k]={ty:0,py:0};totalAcc[k].ty+=v.ty;totalAcc[k].py+=v.py;});
+  });
+
+  // AI Insights
+  (function(){
+    const el=document.getElementById('sroAiInsights');if(!el)return;
+    const items=[];const bName=brand.includes('Jordan')?'Jordan':'Nike';
+    const tot=totalAcc['total'];
+    if(tot&&tot.py>0){
+      const chg=((tot.ty-tot.py)/Math.abs(tot.py))*100;
+      items.push(bName+' total seasonal revenue is '+_aiHL(_aiFmtVal(tot.ty,true))+', '+_aiPct(chg)+' vs PY.');
+    }else if(tot){items.push(bName+' total seasonal revenue is '+_aiHL(_aiFmtVal(tot.ty,true))+'.');}
+    const geos=['NA','EMEA','GC','APLA'];const geoInsights=[];
+    geos.forEach(g=>{const gd=totalAcc['geo_'+g];if(gd&&gd.py>0){const chg=((gd.ty-gd.py)/Math.abs(gd.py))*100;if(Math.abs(chg)>5)geoInsights.push({geo:g,chg,ty:gd.ty});}});
+    if(geoInsights.length>0){const top=geoInsights.sort((a,b)=>b.chg-a.chg);const best=top[0],worst=top[top.length-1];if(best.chg>0)items.push(_aiHL(best.geo)+' leads geo growth at '+_aiPct(best.chg)+' ('+_aiFmtVal(best.ty,true)+').');if(worst.chg<0&&worst!==best)items.push(_aiHL(worst.geo)+' is under pressure at '+_aiPct(worst.chg)+' — monitor distribution and buy patterns.');}
+    const sportInsights=[];
+    sportOrder.filter(sp=>acc[sp]&&acc[sp]['total']).forEach(sp=>{const d=acc[sp]['total'];if(d.py>0){const chg=((d.ty-d.py)/Math.abs(d.py))*100;sportInsights.push({sp,chg,ty:d.ty});}});
+    if(sportInsights.length>0){const top=sportInsights.sort((a,b)=>b.chg-a.chg);if(top[0].chg>5)items.push('Fastest-growing sport: '+_aiHL(top[0].sp)+' at '+_aiPct(top[0].chg)+'.');const bottom=top[top.length-1];if(bottom.chg<-3)items.push('Watch '+_aiHL(bottom.sp)+' trending '+_aiPct(bottom.chg)+' — potential headwind for the season.');}
+    if(items.length===0)items.push('Select seasons and filters to view revenue insights.');
+    el.innerHTML=_aiWrap(items,'Revenue by sport and geography computed from filtered OP Submit data.');
+  })();
+
+  function sroCell(sportAcc,key){const v=(sportAcc||{})[key];if(!v)return'<td>—</td><td>—</td>';return'<td>'+fmtD(v.ty)+'</td><td>'+pctStr(v.ty,v.py)+'</td>';}
+  t+='<tr class="total-row"><td>'+bLbl.replace(/<br>/g,' ')+'</td>';
+  colGroups.forEach(cg=>{cg.keys.forEach(k=>t+=sroCell(totalAcc,k));});
+  t+='</tr>';
+
+  // Sport rows
+  const visibleSports=sportOrder.filter(sp=>acc[sp]);
+  visibleSports.forEach(sp=>{
+    t+='<tr><td>'+sp+'</td>';
+    colGroups.forEach(cg=>{cg.keys.forEach(k=>t+=sroCell(acc[sp],k));});
+    t+='</tr>';
+  });
+  // FBAT detail for Jordan
+  if(jordanB){
+    t+='<tr class="detail-header"><td colspan="99">FBAT Detail</td></tr>';
+    JORDAN_FBAT.forEach(sp=>{
+      if(!acc[sp])return;
+      t+='<tr class="detail-row"><td>'+sp+'</td>';
+      colGroups.forEach(cg=>{cg.keys.forEach(k=>t+=sroCell(acc[sp],k));});
+      t+='</tr>';
+    });
+  }
+  t+='</tbody></table>';
+  document.getElementById('sroTableWrap').innerHTML=t;
+}
+setupBrandBtns('[data-sro-brand]',btn=>{APP.sroBrand=btn.dataset.sroBrand;},initSro);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DPFR TAB (Franchise Breakdown)
+   ═══════════════════════════════════════════════════════════════════════════ */
+function initDpfr(){
+  const d=APP.data;if(!d)return;
+  const brand=APP.dpfrBrand;
+  const fo=d.fo||{};
+  const jordanB=brand.includes('Jordan');
+  const bSports=(fo.sports||[]).filter(sp=>{
+    if(jordanB)return['Kids','Streetwear','Basketball','Golf','FBAT','American Football','Global Football','Baseball','Training'].includes(sp);
+    return true;
+  });
+  const bFr=(fo.franchises||[]).filter(f=>f!=='_Other');
+  const fs=fo.seasons||[];const dpfrP=_preselectFromDefault(fs);
+  buildFilterSet('dpfrFilters',[
+    {id:'season',label:'Season',values:fs,preselect:dpfrP.length?dpfrP:fs.filter(s=>/202[67]/.test(s))},
+    {id:'geo',label:'Geo',values:fo.geos||[],preselect:[]},
+    {id:'sport',label:'Sport',values:bSports,preselect:[]},
+    {id:'div',label:'Product Engine',values:fo.divs||[],preselect:[]},
+    {id:'con',label:'Consumer',values:fo.consumers||[],preselect:[]},
+    {id:'sb',label:'Sub Brand',values:fo.sub_brands||[],preselect:[]},
+    {id:'fr',label:'Franchise',values:bFr,preselect:[]},
+    {id:'bnb',label:'Branded/Non-Branded',values:fo.bnbs||[],preselect:[]},
+    {id:'overlay',label:'Trend Lines',values:['GF+AA+AO Units'],preselect:[]},
+    {id:'pf',label:'PDD Family',values:fo.pdd_families||[],preselect:[]},
+    {id:'psf',label:'PDD Sub Family',values:fo.pdd_sub_families||[],preselect:[]},
+  ],renderDpfr);
+  // Sync Top N toggle button styling
+  [5,10,15,20].forEach(n=>{const b=document.getElementById('dpfrTopN'+n);if(b)b.classList.toggle('active-toggle',n===APP.dpfrTopN);});
+  renderDpfr();
+}
+function _dpfrGetData(){
+  const d=APP.data;if(!d)return null;
+  const brand=APP.dpfrBrand;const M=APP.dpfrMetric;const topN=APP.dpfrTopN||10;
+  const REC=d.fr||[];
+  const fSn=getFSet('dpfrFilters','season'),fGe=getFSet('dpfrFilters','geo'),fDv=getFSet('dpfrFilters','div');
+  const fSb=getFSet('dpfrFilters','sb'),fSp=getF('dpfrFilters','sport'),fCo=getFSet('dpfrFilters','con'),fFr=getFSet('dpfrFilters','fr');
+  const fBnb=getFSet('dpfrFilters','bnb'),fPf=getFSet('dpfrFilters','pf'),fPsf=getFSet('dpfrFilters','psf');
+  const ALWAYS_OTHER=new Set(['_Other']);
+
+  function matchR(r){
+    if(r.b!==brand)return false;
+    if(fSn&&!fSn.has(r.s))return false;
+    if(fGe&&!fGe.has(r.geo))return false;
+    if(fDv&&!fDv.has(r.dv))return false;
+    if(fSb&&!fSb.has(r.sb))return false;
+    if(!spMatch(fSp,r.sp,brand))return false;
+    if(fCo&&!fCo.has(r.con))return false;
+    if(fFr&&!fFr.has(r.fr))return false;
+    if(fBnb&&!fBnb.has(r.bnb))return false;
+    if(fPf&&!fPf.has(r.pf))return false;
+    if(fPsf&&!fPsf.has(r.psf))return false;
+    return true;
+  }
+  function matchRNoSeason(r){
+    if(r.b!==brand)return false;
+    if(fGe&&!fGe.has(r.geo))return false;
+    if(fDv&&!fDv.has(r.dv))return false;
+    if(fSb&&!fSb.has(r.sb))return false;
+    if(!spMatch(fSp,r.sp,brand))return false;
+    if(fCo&&!fCo.has(r.con))return false;
+    if(fFr&&!fFr.has(r.fr))return false;
+    if(fBnb&&!fBnb.has(r.bnb))return false;
+    if(fPf&&!fPf.has(r.pf))return false;
+    if(fPsf&&!fPsf.has(r.psf))return false;
+    return true;
+  }
+
+  // Latest gate per season (handles F1/F4, GEO_STYLE, etc.)
+  const frSeasons=new Set(REC.filter(r=>r.b===brand).map(r=>r.s));
+  const latestGate=pickLatestGate(REC,brand,frSeasons);
+  const filtered=REC.filter(r=>matchR(r)&&latestGate[r.s]===r.gt);
+
+  const seasonSet=new Set(filtered.map(r=>r.s));
+  const seasons=[...seasonSet].sort(seasonCmp);
+
+  const sfMap={};
+  filtered.forEach(r=>{const k=r.s+'||'+r.fr;sfMap[k]=(sfMap[k]||0)+(r[M]||0);});
+
+  const frTotals={};
+  Object.entries(sfMap).forEach(([k,v])=>{const fr=k.split('||')[1];frTotals[fr]=(frTotals[fr]||0)+v;});
+  const allFr=Object.keys(frTotals).sort((a,b)=>frTotals[b]-frTotals[a]);
+  const rankable=allFr.filter(fr=>!ALWAYS_OTHER.has(fr));
+  const topN_fr=rankable.slice(0,topN);
+  const topN_set=new Set(topN_fr);
+
+  function val(s,fr){return sfMap[s+'||'+fr]||0;}
+  function allOtherVal(s){let t=0;allFr.forEach(fr=>{if(!topN_set.has(fr))t+=(sfMap[s+'||'+fr]||0);});return t;}
+
+  // All-season map for PY lookups (ignores Season filter)
+  const latestGateAll=pickLatestGate(REC,brand,frSeasons);
+  const filteredAll=REC.filter(r=>matchRNoSeason(r)&&latestGateAll[r.s]===r.gt);
+  const sfMapAll={};
+  filteredAll.forEach(r=>{const k=r.s+'||'+r.fr;sfMapAll[k]=(sfMapAll[k]||0)+(r[M]||0);});
+  const allOtherAllMap={};
+  Object.entries(sfMapAll).forEach(([k,v])=>{const[s,fr]=k.split('||');if(!topN_set.has(fr))allOtherAllMap[s]=(allOtherAllMap[s]||0)+v;});
+  function valAll(s,fr){return sfMapAll[s+'||'+fr]||0;}
+  function allOtherValAll(s){return allOtherAllMap[s]||0;}
+
+  return{metric:M,topN,seasons,sfMap,frTotals,allFr,topN_fr,topN_set,val,allOtherVal,valAll,allOtherValAll,ALWAYS_OTHER};
+}
+
+function renderDpfr(){
+  const d=APP.data;if(!d)return;
+  const brand=APP.dpfrBrand;const M=APP.dpfrMetric;
+
+  // Toggle styling
+  document.getElementById('dpfrToggleU').classList.toggle('active-toggle',M==='u');
+  document.getElementById('dpfrToggleD').classList.toggle('active-toggle',M==='fpd');
+  [5,10,15,20].forEach(n=>{const b=document.getElementById('dpfrTopN'+n);if(b)b.classList.toggle('active-toggle',n===APP.dpfrTopN);});
+
+  _renderDpfrInsights();
+  _renderDpfrChart();
+  _renderDpfrBarTable();
+  _renderDpfrGDTable('dpfrGainerWrap','dpfrGainerTitle',true);
+  _renderDpfrGDTable('dpfrDrainerWrap','dpfrDrainerTitle',false);
+}
+
+/* ── DPFR Insights Header ─────────────────────────────────────────────── */
+function _renderDpfrInsights(){
+  const titleEl=document.getElementById('dpfrChartTitle');
+  if(!titleEl)return;
+  const dd=_dpfrGetData();if(!dd)return;
+  const{metric,topN,seasons,frTotals,topN_fr,topN_set,allFr,val,allOtherVal,valAll,allOtherValAll}=dd;
+  const metricLabel=metric==='fpd'?'Dollars':'Units';
+  const isDollar=metric==='fpd';
+  titleEl.textContent='Demand Plan \u2014 '+metricLabel+' by Franchise (Season Over Season)';
+
+  // AI Insights
+  const el=document.getElementById('dpfrAiInsights');if(!el)return;
+  const items=[];
+  const bName=APP.dpfrBrand.includes('Jordan')?'Jordan':'Nike';
+  const grandTotal=allFr.reduce((s,fr)=>(frTotals[fr]||0)+s,0);
+  if(grandTotal>0)items.push(bName+' total demand plan '+metricLabel.toLowerCase()+' across selected seasons: '+_aiHL(_aiFmtVal(grandTotal,isDollar))+'.');
+  if(topN_fr.length>0){
+    const top1=topN_fr[0],top1Val=frTotals[top1]||0;
+    const top1Pct=(top1Val/grandTotal*100).toFixed(1);
+    items.push('Top franchise '+_aiHL(top1)+' represents '+_aiHL(top1Pct+'%')+' of total ('+_aiFmtVal(top1Val,isDollar)+').');
+  }
+  if(seasons.length>=2){
+    const latest=seasons[seasons.length-1],prev=seasons[seasons.length-2];
+    const totLatest=allFr.reduce((s,fr)=>s+(val(latest,fr)||0),0)+allOtherVal(latest);
+    const totPrev=allFr.reduce((s,fr)=>s+(val(prev,fr)||0),0)+allOtherVal(prev);
+    if(totPrev>0){const chg=((totLatest-totPrev)/Math.abs(totPrev))*100;items.push('Season-over-season ('+prev+' \u2192 '+latest+'): '+_aiPct(chg)+' — '+(chg>0?'demand is building.':'plan is pulling back.'));}
+  }
+  if(topN_fr.length>=2&&seasons.length>=2){
+    const latest=seasons[seasons.length-1],prev=seasons[seasons.length-2];
+    let bestFr='',bestChg=-Infinity,worstFr='',worstChg=Infinity;
+    topN_fr.slice(0,5).forEach(fr=>{const c=val(latest,fr)||0,p=val(prev,fr)||0;if(p>0){const chg=((c-p)/Math.abs(p))*100;if(chg>bestChg){bestChg=chg;bestFr=fr;}if(chg<worstChg){worstChg=chg;worstFr=fr;}}});
+    if(bestFr&&bestChg>3)items.push('Fastest-growing franchise: '+_aiHL(bestFr)+' at '+_aiPct(bestChg)+' season-over-season.');
+    if(worstFr&&worstChg<-3&&worstFr!==bestFr)items.push('Largest decline: '+_aiHL(worstFr)+' at '+_aiPct(worstChg)+' — review marketplace signals.');
+  }
+  if(items.length===0)items.push('Select seasons and filters to view franchise breakdown insights.');
+  el.innerHTML=_aiWrap(items,'Franchise demand concentration and trend analysis across selected seasons.');
+}
+
+/* ── DPFR Stacked Area Chart with Overlay Line ────────────────────────── */
+function _renderDpfrChart(){
+  const dd=_dpfrGetData();if(!dd)return;
+  const{metric,topN,seasons,frTotals,topN_fr,topN_set,val,allOtherVal}=dd;
+  const brand=APP.dpfrBrand;
+
+  if(seasons.length===0){Plotly.purge('dpfrChart');return;}
+
+  const COLORS=['#E65100','#2E7D32','#4A148C','#01579B','#B71C1C','#00838F','#1A237E','#F9A825','#558B2F','#E91E63'];
+  const ALL_OTHER_COLOR='#BDBDBD';
+
+  // Stacked area traces (smallest first, All Other on top)
+  const ordered=[...topN_fr].sort((a,b)=>frTotals[a]-frTotals[b]);
+  const traces=[];
+  ordered.forEach((fr,i)=>{
+    const col=COLORS[i%COLORS.length];
+    traces.push({name:fr,x:seasons,y:seasons.map(s=>val(s,fr)),type:'scatter',mode:'lines',stackgroup:'one',groupnorm:'',line:{color:col,width:0.5},fillcolor:col,hovertemplate:'<b>%{fullData.name}</b>: %{y:,.0f}<extra></extra>'});
+  });
+  traces.push({name:'All Other',x:seasons,y:seasons.map(s=>allOtherVal(s)),type:'scatter',mode:'lines',stackgroup:'one',groupnorm:'',line:{color:ALL_OTHER_COLOR,width:0.5},fillcolor:ALL_OTHER_COLOR,hovertemplate:'<b>All Other</b>: %{y:,.0f}<extra></extra>'});
+
+  // Overlay line from OP Submit data (aggregate dp/fpd by brand+season)
+  const fOverlay=getFSet('dpfrFilters','overlay');
+  const showGS=!fOverlay||fOverlay.has('GF+AA+AO Units');
+  const srByBrand={};
+  if(showGS&&APP.data.op){
+    APP.data.op.forEach(r=>{
+      if(r.b!==brand)return;
+      if(!srByBrand[r.s])srByBrand[r.s]={dp:0,fpd:0};
+      srByBrand[r.s].dp+=(r.dp||0);
+      srByBrand[r.s].fpd+=(r.fpd||0);
+    });
+  }
+  const gsX=[],gsY=[];
+  if(showGS){
+    seasons.forEach(s=>{
+      const sd=srByBrand[s];if(!sd)return;
+      if(metric==='fpd'){if(sd.fpd>0){gsX.push(s);gsY.push(sd.fpd);}}
+      else{if(sd.dp>0){gsX.push(s);gsY.push(sd.dp);}}
+    });
+  }
+
+  // Chart geometry
+  const maxStacked=seasons.length?Math.max(...seasons.map(s=>topN_fr.reduce((acc,fr)=>acc+(val(s,fr)||0),0)+(allOtherVal(s)||0))):1;
+  const gsMax=gsY.length>0?Math.max(...gsY):0;
+  const y1Max=Math.max(maxStacked,gsMax)*1.08;
+
+  // Y-axis tick labels: X.XMu for units, X.XM for dollars
+  const tickSuffix=metric==='fpd'?'M':'Mu';
+  function fmtTickLabel(v){
+    var m=v/1e6;var s=m.toFixed(1);var p=s.split('.');
+    var intPart=p[0],decPart=p[1];var result='';var len=intPart.length;
+    for(var ci=0;ci<len;ci++){if(ci>0&&(len-ci)%3===0)result+=',';result+=intPart[ci];}
+    return result+'.'+decPart+tickSuffix;
+  }
+  var niceSteps=[0.1e6,0.2e6,0.5e6,1e6,2e6,5e6,10e6,20e6,50e6,100e6,200e6,500e6,1000e6];
+  var niceStep=niceSteps[niceSteps.length-1];
+  for(var si=0;si<niceSteps.length;si++){if(y1Max/niceSteps[si]<=8){niceStep=niceSteps[si];break;}}
+  var tickVals=[],tickTexts=[];
+  for(var tv=0;tv<=y1Max;tv+=niceStep){tickVals.push(tv);tickTexts.push(fmtTickLabel(tv));}
+
+  // Dotted line trace
+  const dotLineName=metric==='fpd'?'GF+AA+AO $':'GF+AA+AO Units';
+  if(gsX.length>0){
+    const lblFn=v=>v==null?'':fmtTickLabel(v);
+    traces.push({name:dotLineName,x:gsX,y:gsY,type:'scatter',mode:'lines+markers+text',yaxis:'y',line:{color:'#111111',dash:'dot',width:2.5,shape:'spline',smoothing:1.0},marker:{color:'#111111',size:6},text:gsY.map(lblFn),textposition:'top center',textfont:{size:10,color:'#111111'},hovertemplate:'<b>'+dotLineName+'</b>: %{y:,.0f}<extra></extra>',cliponaxis:false});
+  }
+
+  const metricLabel=metric==='fpd'?'Dollars':'Units';
+  Plotly.react('dpfrChart',traces,{
+    paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',
+    font:{color:'#222',size:12,family:"'Helvetica Neue',Helvetica,Arial,sans-serif"},
+    margin:{t:10,r:20,b:50,l:70},
+    xaxis:{showgrid:false,zeroline:false,tickfont:{size:12,color:'#333'}},
+    yaxis:{showgrid:false,zeroline:false,title:{text:metricLabel,font:{size:12}},tickvals:tickVals,ticktext:tickTexts,range:[0,y1Max]},
+    legend:{orientation:'v',x:1.02,xanchor:'left',y:1.0,yanchor:'top',font:{size:11},bgcolor:'rgba(255,255,255,0.9)',bordercolor:'#E0E0E0',borderwidth:1,traceorder:'reversed'},
+    showlegend:true,hovermode:'x unified',autosize:true
+  },{responsive:true,displayModeBar:false});
+}
+
+/* ── DPFR Bar Table (Franchise × Season) ──────────────────────────────── */
+function _renderDpfrBarTable(){
+  const dd=_dpfrGetData();if(!dd)return;
+  const{metric,topN,seasons,frTotals,topN_fr,val,allOtherVal,valAll,allOtherValAll}=dd;
+  const isFpd=metric==='fpd';
+
+  const barTitleEl=document.getElementById('dpfrBarTitle');
+  if(barTitleEl)barTitleEl.textContent='Top '+topN+' Franchise \u2014 '+(isFpd?'Dollars':'Units')+' by Season';
+  const wrap=document.getElementById('dpfrBarWrap');
+  const tWrap=document.getElementById('dpfrTableWrap');
+  if(!wrap){if(tWrap)tWrap.innerHTML='';return;}
+  if(seasons.length===0||topN_fr.length===0){wrap.innerHTML='';if(tWrap)tWrap.innerHTML='';return;}
+
+  const orderedFr=[...topN_fr].sort((a,b)=>frTotals[b]-frTotals[a]);
+  function fmtV(v){if(!v)return'\u2014';const a=Math.abs(v);if(isFpd){if(a>=1e9)return'$'+(v/1e9).toFixed(1)+'B';if(a>=1e6)return'$'+(v/1e6).toFixed(1)+'M';if(a>=1e3)return'$'+(v/1e3).toFixed(0)+'K';return'$'+v.toFixed(0);}else{if(a>=1e6)return(v/1e6).toFixed(1)+'M';if(a>=1e3)return(v/1e3).toFixed(0)+'K';return v.toFixed(0);}}
+  function fmtDelta(d2){if(!d2||d2===0)return'';const a=Math.abs(d2),sign=d2>0?'+':'-';if(isFpd){if(a>=1e9)return sign+'$'+(a/1e9).toFixed(1)+'B';if(a>=1e6)return sign+'$'+(a/1e6).toFixed(1)+'M';if(a>=1e3)return sign+'$'+(a/1e3).toFixed(0)+'K';return sign+'$'+a.toFixed(0);}else{if(a>=1e6)return sign+(a/1e6).toFixed(1)+'M';if(a>=1e3)return sign+(a/1e3).toFixed(0)+'K';return sign+a.toFixed(0);}}
+  function priorYrSeason(s){if(!s||s.length<4)return null;const yr=parseInt(s.slice(2));return isNaN(yr)?null:s.slice(0,2)+(yr-1);}
+
+  const BT='padding:7px 10px;border:1px solid #D0D4DA;font-size:0.8rem;white-space:nowrap;';
+  const BD='padding:6px 10px;border:1px solid #EAECEF;font-size:0.8rem;text-align:right;white-space:nowrap;';
+  function thGroup(txt,cs){return'<th colspan="'+cs+'" style="'+BT+'background:#1A237E;color:#fff;font-weight:700;text-align:center;">'+txt+'</th>';}
+  function thSub(txt){return'<th style="'+BT+'background:#E8EAF6;color:#333;font-weight:600;text-align:right;">'+txt+'</th>';}
+  function thFranchise(){return'<th rowspan="2" style="'+BT+'background:#1A237E;color:#fff;font-weight:700;text-align:left;position:sticky;left:0;z-index:2;min-width:160px;">Franchise</th>';}
+  function tdV(v,bold,bt){const fw=bold?'700':'400';const bts=bt?'border-top:2px solid #C0C4CA;':'';return'<td style="'+BD+'font-weight:'+fw+';'+bts+'">'+(v?fmtV(v):'\u2014')+'</td>';}
+  function tdFr(txt,bold,italic,bt){const fw=bold?'700':'400';const bts=bt?'border-top:2px solid #C0C4CA;':'';const w=italic?'<em>'+txt+'</em>':txt;return'<td style="'+BD+'text-align:left;font-weight:'+fw+';position:sticky;left:0;background:#fff;z-index:1;'+bts+'">'+w+'</td>';}
+  function tdPct(cur,pyV,bold,bt){if(!cur||cur===0||!pyV||pyV===0){const bts=bt?'border-top:2px solid #C0C4CA;':'';return'<td style="'+BD+bts+'"></td>';}const delta=cur-pyV;const pct=(delta/pyV)*100;const sign=pct>=0?'+':'';const col=pct>=0?'#2E7D32':'#C62828';const fw=bold?'700':'400';const bts=bt?'border-top:2px solid #C0C4CA;':'';return'<td style="'+BD+'color:'+col+';font-weight:'+fw+';'+bts+'">'+sign+pct.toFixed(1)+'%</td>';}
+  function tdDelta(cur,pyV,bold,bt){if(!cur||cur===0||!pyV||pyV===0){const bts=bt?'border-top:2px solid #C0C4CA;':'';return'<td style="'+BD+bts+'"></td>';}const delta=cur-pyV;const col=delta>=0?'#2E7D32':'#C62828';const fw=bold?'700':'400';const bts=bt?'border-top:2px solid #C0C4CA;':'';return'<td style="'+BD+'color:'+col+';font-weight:'+fw+';'+bts+'">'+fmtDelta(delta)+'</td>';}
+
+  const metricLbl=isFpd?'Dollars':'Units';
+  let html='<table style="border-collapse:collapse;min-width:100%;"><thead><tr>'+thFranchise();
+  seasons.forEach(s=>{html+=thGroup(s,3);});
+  html+=thGroup('Total',2)+'</tr><tr>';
+  seasons.forEach(()=>{html+=thSub(metricLbl)+thSub('vs PY %')+thSub('vs PY \u0394');});
+  html+=thSub(metricLbl)+thSub('vs PY %')+'</tr></thead><tbody>';
+
+  orderedFr.forEach((fr,i)=>{
+    const bg=i%2===0?'#FFFFFF':'#F8F9FB';
+    const rowTotal=seasons.reduce((a,s)=>a+(val(s,fr)||0),0);
+    const rowPyTotal=seasons.reduce((a,s)=>{const ps=priorYrSeason(s);return a+(ps?valAll(ps,fr):0);},0);
+    html+='<tr style="background:'+bg+';">'+tdFr(fr,true);
+    seasons.forEach(s=>{const ps=priorYrSeason(s);const pyV=ps?valAll(ps,fr):0;html+=tdV(val(s,fr))+tdPct(val(s,fr),pyV)+tdDelta(val(s,fr),pyV);});
+    html+=tdV(rowTotal,true)+tdPct(rowTotal,rowPyTotal,true)+'</tr>';
+  });
+
+  // All Other row
+  const aoTotal=seasons.reduce((a,s)=>a+(allOtherVal(s)||0),0);
+  const aoPyTotal=seasons.reduce((a,s)=>{const ps=priorYrSeason(s);return a+(ps?allOtherValAll(ps):0);},0);
+  html+='<tr style="background:#F4F5F8;">'+tdFr('<em>All Other</em>',false);
+  seasons.forEach(s=>{const ps=priorYrSeason(s);const pyV=ps?allOtherValAll(ps):0;html+=tdV(allOtherVal(s))+tdPct(allOtherVal(s),pyV)+tdDelta(allOtherVal(s),pyV);});
+  html+=tdV(aoTotal)+tdPct(aoTotal,aoPyTotal)+'</tr>';
+
+  // Grand Total row
+  const rowAll=s=>orderedFr.reduce((a,fr)=>a+(val(s,fr)||0),0)+(allOtherVal(s)||0);
+  const rowAllPy=s=>{const ps=priorYrSeason(s);return ps?orderedFr.reduce((a,fr)=>a+(valAll(ps,fr)||0),0)+(allOtherValAll(ps)||0):0;};
+  const grandTotal=seasons.reduce((a,s)=>a+rowAll(s),0);
+  const grandTotalPy=seasons.reduce((a,s)=>a+rowAllPy(s),0);
+  html+='<tr style="background:#E8EAF0;">'+tdFr('Grand Total',true,false,true);
+  seasons.forEach(s=>{const pyV=rowAllPy(s);html+=tdV(rowAll(s),true,true)+tdPct(rowAll(s),pyV,true,true)+tdDelta(rowAll(s),pyV,true,true);});
+  html+=tdV(grandTotal,true,true)+tdPct(grandTotal,grandTotalPy,true,true)+'</tr>';
+  html+='</tbody></table>';
+  wrap.innerHTML=html;
+  if(tWrap)tWrap.innerHTML='';
+}
+
+/* ── DPFR Gainer/Drainer Table Builder ────────────────────────────────── */
+function _renderDpfrGDTable(wrapId,titleId,isGainer){
+  const dd=_dpfrGetData();if(!dd)return;
+  const{metric,topN,seasons,allFr,val,valAll,ALWAYS_OTHER}=dd;
+  const isFpd=metric==='fpd';
+  const titleEl=document.getElementById(titleId);
+  const wrap=document.getElementById(wrapId);if(!wrap)return;
+
+  function priorYrSeason(s){if(!s||s.length<4)return null;const yr=parseInt(s.slice(2));return isNaN(yr)?null:s.slice(0,2)+(yr-1);}
+  const EXCL=new Set(['no franchise','*unk*','not applicable','not_suppld','','_other']);
+
+  const frDeltaMap={};
+  allFr.forEach(fr=>{
+    if(EXCL.has((fr||'').toLowerCase()))return;
+    if(ALWAYS_OTHER&&ALWAYS_OTHER.has(fr))return;
+    let tot=0,hasPY=false;
+    seasons.forEach(s=>{const ps=priorYrSeason(s);if(!ps)return;const ty=val(s,fr)||0;const py=valAll(ps,fr)||0;tot+=ty-py;hasPY=true;});
+    if(hasPY)frDeltaMap[fr]=tot;
+  });
+
+  const candidates=Object.entries(frDeltaMap)
+    .filter(([,delta])=>isGainer?delta>0:delta<0)
+    .sort((a,b)=>isGainer?b[1]-a[1]:a[1]-b[1])
+    .slice(0,topN).map(([fr])=>fr);
+
+  const label=isGainer?'Gainer':'Drainer';
+  const headerBg=isGainer?'#1B5E20':'#B71C1C';
+  const subHeaderBg=isGainer?'#E8F5E9':'#FFEBEE';
+  const subHeaderFg=isGainer?'#1B5E20':'#B71C1C';
+  const metricLbl=isFpd?'Dollars':'Units';
+
+  if(titleEl)titleEl.textContent='Top '+topN+' Franchise \u2014 '+label+' By Season ('+metricLbl+' vs PY)';
+  if(seasons.length===0||candidates.length===0){wrap.innerHTML='<p style="color:#888;font-size:0.85rem;padding:1rem 0;">No '+label.toLowerCase()+'s found for current filter selection.</p>';return;}
+
+  function fmtV(v){if(!v)return'\u2014';const a=Math.abs(v);if(isFpd){if(a>=1e9)return'$'+(v/1e9).toFixed(1)+'B';if(a>=1e6)return'$'+(v/1e6).toFixed(1)+'M';if(a>=1e3)return'$'+(v/1e3).toFixed(0)+'K';return'$'+v.toFixed(0);}else{if(a>=1e6)return(v/1e6).toFixed(1)+'M';if(a>=1e3)return(v/1e3).toFixed(0)+'K';return v.toFixed(0);}}
+  function fmtDelta(d2){if(!d2||d2===0)return'';const a=Math.abs(d2),sign=d2>0?'+':'-';if(isFpd){if(a>=1e9)return sign+'$'+(a/1e9).toFixed(1)+'B';if(a>=1e6)return sign+'$'+(a/1e6).toFixed(1)+'M';if(a>=1e3)return sign+'$'+(a/1e3).toFixed(0)+'K';return sign+'$'+a.toFixed(0);}else{if(a>=1e6)return sign+(a/1e6).toFixed(1)+'M';if(a>=1e3)return sign+(a/1e3).toFixed(0)+'K';return sign+a.toFixed(0);}}
+
+  const BT='padding:7px 10px;border:1px solid #D0D4DA;font-size:0.8rem;white-space:nowrap;';
+  const BD='padding:6px 10px;border:1px solid #EAECEF;font-size:0.8rem;text-align:right;white-space:nowrap;';
+  function thGroup(txt,cs){return'<th colspan="'+cs+'" style="'+BT+'background:'+headerBg+';color:#fff;font-weight:700;text-align:center;">'+txt+'</th>';}
+  function thSub(txt){return'<th style="'+BT+'background:'+subHeaderBg+';color:'+subHeaderFg+';font-weight:600;text-align:right;">'+txt+'</th>';}
+  function thFranchise(){return'<th rowspan="2" style="'+BT+'background:'+headerBg+';color:#fff;font-weight:700;text-align:left;position:sticky;left:0;z-index:2;min-width:160px;">Franchise</th>';}
+  function tdFranchise(txt,bold,bt){const fw=bold?'700':'400';const bts=bt?'border-top:2px solid #C0C4CA;':'';return'<td style="'+BD+'text-align:left;font-weight:'+fw+';position:sticky;left:0;background:#fff;z-index:1;'+bts+'">'+txt+'</td>';}
+  function tdVal(v,bold,bt){const fw=bold?'700':'400';const bts=bt?'border-top:2px solid #C0C4CA;':'';return'<td style="'+BD+'font-weight:'+fw+';'+bts+'">'+(v?fmtV(v):'\u2014')+'</td>';}
+  function tdDeltaCell(delta,bold,bt){const col=delta>0?'#2E7D32':(delta<0?'#C62828':'#555');const fw=bold?'700':'400';const bts=bt?'border-top:2px solid #C0C4CA;':'';const txt=delta?fmtDelta(delta):'\u2014';return'<td style="'+BD+'color:'+col+';font-weight:'+fw+';'+bts+'">'+txt+'</td>';}
+  function tdPct(ty,py,bold,bt){if(!ty||ty===0||!py||py===0){const bts=bt?'border-top:2px solid #C0C4CA;':'';return'<td style="'+BD+bts+'">\u2014</td>';}const pct=((ty-py)/py)*100;const sign=pct>=0?'+':'';const col=pct>=0?'#2E7D32':'#C62828';const fw=bold?'700':'400';const bts=bt?'border-top:2px solid #C0C4CA;':'';return'<td style="'+BD+'color:'+col+';font-weight:'+fw+';'+bts+'">'+sign+pct.toFixed(1)+'%</td>';}
+
+  let html='<table style="border-collapse:collapse;min-width:100%;"><thead><tr>'+thFranchise();
+  seasons.forEach(s=>{html+=thGroup(s,3);});
+  html+=thGroup('Total',3)+'</tr><tr>';
+  seasons.forEach(()=>{html+=thSub(metricLbl)+thSub('vs PY \u0394')+thSub('vs PY %');});
+  html+=thSub(metricLbl)+thSub('vs PY \u0394')+thSub('vs PY %')+'</tr></thead><tbody>';
+
+  candidates.forEach((fr,i)=>{
+    const bg=i%2===0?'#FFFFFF':'#F8F9FB';
+    html+='<tr style="background:'+bg+';">'+tdFranchise(fr,true);
+    let rowTot=0,rowPyTot=0;
+    seasons.forEach(s=>{const ps=priorYrSeason(s);const ty=val(s,fr)||0;const py=ps?(valAll(ps,fr)||0):0;rowTot+=ty;rowPyTot+=py;html+=tdVal(ty)+tdDeltaCell(ty-py)+tdPct(ty,py);});
+    const totDelta=rowTot-rowPyTot;
+    html+=tdVal(rowTot,true,true)+tdDeltaCell(totDelta,true,true)+tdPct(rowTot,rowPyTot,true,true)+'</tr>';
+  });
+  html+='</tbody></table>';
+  wrap.innerHTML=html;
+}
+setupBrandBtns('[data-dpfr-brand]',btn=>{APP.dpfrBrand=btn.dataset.dpfrBrand;},initDpfr);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GR TAB (Growth Rate Overview)
+   ═══════════════════════════════════════════════════════════════════════════ */
+function initGr(){
+  const d=APP.data;if(!d)return;
+  const brand=APP.grBrand;
+  const D=d.u;
+  const seasons=new Set(),geos=new Set(),divs=new Set(),subBrands=new Set(),sports=new Set();
+  D.forEach(r=>{
+    if(r.s)seasons.add(r.s);
+    if(r.b!==brand)return;
+    if(r.geo)geos.add(r.geo);
+    if(r.div)divs.add(r.div);
+    if(r.sb&&r.sb.toUpperCase()!=='NOT_SUPPLD')subBrands.add(r.sb);
+    if(brand==='Jordan'){const sp=jordanSportDetail(r.gsf,r.con);if(sp)sports.add(sp);}
+    else{if(r.gsf)sports.add(r.gsf);}
+  });
+  if(brand==='Jordan'){let h=false;FBAT_SET.forEach(s=>{if(sports.has(s))h=true;});if(h)sports.add('FBAT');}
+  const seasonList=[...seasons].sort(seasonCmp).reverse();
+  const grPre=_preselectFromDefault([...seasons].sort(seasonCmp)).filter(s=>seasonList.indexOf(s)>=0);
+  const sportList=brand==='Jordan'?['Kids','Streetwear','Basketball','Golf','FBAT',...JORDAN_FBAT].filter(s=>sports.has(s)):[...sports].filter(Boolean).sort();
+  buildFilterSet('grFilters',[
+    {id:'season',label:'Season',values:seasonList,preselect:grPre},
+    {id:'geo',label:'Geo',values:[...geos].sort(),preselect:[]},
+    {id:'div',label:'Division',values:[...divs].sort(),preselect:[]},
+    {id:'sb',label:'Sub Brand',values:[...subBrands].sort(),preselect:[]},
+    {id:'sport',label:'Sport',values:sportList,preselect:[]},
+  ],renderGr);
+  renderGr();
+}
+function renderGr(){
+  const d=APP.data;if(!d)return;
+  const D=d.u||[],OP=d.op||[],brand=APP.grBrand,mode=APP.grMode;
+  const fSn=getFSet('grFilters','season'),fGe=getFSet('grFilters','geo'),fDv=getFSet('grFilters','div');
+  const fSb=getFSet('grFilters','sb'),fSp=getF('grFilters','sport');
+
+  document.getElementById('grToggleSS').classList.toggle('active-toggle',mode==='ss');
+  document.getElementById('grToggleGG').classList.toggle('active-toggle',mode==='gg');
+
+  function matchD(r){
+    if(r.g==='LY')return false;
+    if(r.b!==brand)return false;
+    if(fSn&&!fSn.has(r.s))return false;
+    if(fGe&&!fGe.has(r.geo))return false;
+    if(fDv&&!fDv.has(r.div))return false;
+    if(fSb&&!fSb.has(r.sb))return false;
+    if(fSp&&fSp.length>0){
+      if(brand==='Jordan'){const sp=jordanSportDetail(r.gsf,r.con);if(!sp)return false;if(!spMatch(fSp,sp,brand))return false;}
+      else{if(!fSp.includes(r.gsf))return false;}
+    }
+    return true;
+  }
+  function matchLY(r){
+    if(r.g!=='LY')return false;
+    if(r.b!==brand)return false;
+    if(fGe&&!fGe.has(r.geo))return false;
+    if(fDv&&!fDv.has(r.div))return false;
+    if(fSb&&!fSb.has(r.sb))return false;
+    return true;
+  }
+
+  // Compute SR from OP (brand uses long name for OP)
+  const opBrand=brand==='Nike'?'Nike Brand':'Jordan Brand';
+  const srBySeason={};
+  OP.filter(r=>r.b===opBrand).forEach(r=>{
+    if(!srBySeason[r.s])srBySeason[r.s]={sr:0,srP:0,gs:0,gsP:0};
+    srBySeason[r.s].sr+=(r.sr||0);srBySeason[r.s].srP+=(r.srP||0);
+    srBySeason[r.s].gs+=(r.fpd||0);srBySeason[r.s].gsP+=(r.fpdP||0);
+  });
+
+  const allSeasons=[...new Set(D.map(r=>r.s).filter(Boolean))].sort(seasonCmp);
+  const selected=fSn?[...fSn].sort(seasonCmp):allSeasons;
+
+  function pctLabel(v){if(v==null||isNaN(v))return'';return(v>=0?'+':'')+v.toFixed(1)+'%';}
+
+  // AI Insights
+  (function(){
+    const el=document.getElementById('grAiInsights');if(!el)return;
+    const items=[];const bName=brand;
+    let totSR=0,totSRP=0,totGS=0,totGSP=0;
+    selected.forEach(s=>{const d=srBySeason[s];if(d){totSR+=d.sr;totSRP+=d.srP;totGS+=d.gs;totGSP+=d.gsP;}});
+    if(totSRP>0){const chg=((totSR-totSRP)/Math.abs(totSRP))*100;items.push(bName+' SR growth is '+_aiPct(chg)+' vs PY across selected seasons'+(Math.abs(chg)>5?(chg>0?' — strong topline acceleration.':' — topline deceleration requires attention.'):'.'));}
+    if(totGSP>0){const chg=((totGS-totGSP)/Math.abs(totGSP))*100;items.push('GF+AA+AO $ growth is '+_aiPct(chg)+' vs PY'+(chg<totSRP&&totSRP>0?' — lagging SR; review marketplace margin dynamics.':'.'));}
+    if(selected.length>=2){
+      let bestS='',bestChg=-Infinity,worstS='',worstChg=Infinity;
+      selected.forEach(s=>{const d=srBySeason[s];if(d&&d.srP>0){const chg=((d.sr-d.srP)/Math.abs(d.srP))*100;if(chg>bestChg){bestChg=chg;bestS=s;}if(chg<worstChg){worstChg=chg;worstS=s;}}});
+      if(bestS&&bestChg>3)items.push('Strongest season: '+_aiHL(bestS)+' at '+_aiPct(bestChg)+' SR growth.');
+      if(worstS&&worstChg<-3&&worstS!==bestS)items.push('Weakest season: '+_aiHL(worstS)+' at '+_aiPct(worstChg)+' SR growth — flag for leadership review.');
+    }
+    if(items.length===0)items.push('Select seasons and filters to view growth rate insights.');
+    el.innerHTML=_aiWrap(items,'Growth rates compare current metrics against prior year; WHS $ sourced from APO.');
+  })();
+
+  if(mode==='ss'){
+    const whsByGate={};
+    D.filter(matchD).forEach(r=>{const k=r.s+'|'+r.g;whsByGate[k]=(whsByGate[k]||0)+(r.w||0);});
+    function latestWHS(s){for(let i=G.length-1;i>=0;i--){const k=s+'|'+G[i];if(whsByGate[k])return whsByGate[k];}return 0;}
+
+    const xLabels=[],srGrowth=[],gsGrowth=[],whsGrowth=[];
+    selected.forEach(s=>{
+      const ps=priorSeason(s);
+      const sr=srBySeason[s],srP_s=srBySeason[ps];
+      const srCur=sr?sr.sr:0,srPr=sr?sr.srP:0;
+      const gsCur=sr?sr.gs:0,gsPr=sr?sr.gsP:0;
+      const whsCur=latestWHS(s),whsPr=ps?latestWHS(ps):0;
+      xLabels.push(s);
+      srGrowth.push(srPr?((srCur-srPr)/Math.abs(srPr)*100):null);
+      gsGrowth.push(gsPr?((gsCur-gsPr)/Math.abs(gsPr)*100):null);
+      whsGrowth.push(whsCur&&whsPr?((whsCur-whsPr)/Math.abs(whsPr)*100):null);
+    });
+
+    document.getElementById('grHeader').textContent='Season-over-Season Growth Rates';
+    document.getElementById('grSub').textContent='SR vs PY | GF+AA+AO $ vs PY | WHS $ vs PY';
+    grPlot(xLabels,srGrowth,gsGrowth,whsGrowth,false);
+  }else{
+    // Gate/Gate
+    const whsByGate={};G.forEach(g=>whsByGate[g]=0);
+    let lyWHS=0;
+    const pySeasons=new Set();selected.forEach(s=>{const ps=priorSeason(s);if(ps)pySeasons.add(ps);});
+    D.filter(matchD).forEach(r=>{if(selected.includes(r.s)&&whsByGate.hasOwnProperty(r.g))whsByGate[r.g]+=(r.w||0);});
+    D.filter(matchLY).forEach(r=>{if(pySeasons.has(r.s))lyWHS+=(r.w||0);});
+
+    const srGrowth=[],gsGrowth=[],whsGrowth=[];
+    G.forEach(g=>{
+      let sr=0,srPy=0,gs=0,gsPy=0;
+      selected.forEach(s=>{
+        const d=srBySeason[s];
+        if(d){sr+=d.sr;srPy+=d.srP;gs+=d.gs;gsPy+=d.gsP;}
+      });
+      srGrowth.push(srPy?((sr-srPy)/Math.abs(srPy)*100):null);
+      gsGrowth.push(gsPy?((gs-gsPy)/Math.abs(gsPy)*100):null);
+      const whs=whsByGate[g];
+      whsGrowth.push(whs&&lyWHS?((whs-lyWHS)/Math.abs(lyWHS)*100):null);
+    });
+
+    const lbl=selected.length===1?selected[0]:(selected.length>0?selected[0]+'\u2013'+selected[selected.length-1]:'Selected');
+    document.getElementById('grHeader').textContent='Gate-over-Gate Growth Rates \u2014 '+lbl;
+    document.getElementById('grSub').textContent='SR vs PY | GF+AA+AO $ vs PY | WHS $ vs PY';
+    grPlot(G,srGrowth,gsGrowth,whsGrowth,true);
+  }
+}
+function grPlot(x,sr,gs,whs,isGate){grPlotInto('grChart',x,sr,gs,whs,isGate);}
+function grPlotInto(chartId,x,sr,gs,whs,isGate){
+  function pL(v){if(v==null)return'';return(v>=0?'+':'')+v.toFixed(1)+'%';}
+  const el=document.getElementById(chartId);
+  if(!el)return;
+  Plotly.react(chartId,[
+    {x,y:sr,name:'SR Growth %',type:'scatter',mode:'lines+markers+text',text:sr.map(pL),textposition:'top center',textfont:{size:11,color:'#000'},line:{color:'#000',width:3,shape:'spline',smoothing:1.0},marker:{size:8,color:'#000'},connectgaps:true},
+    {x,y:gs,name:'GF+AA+AO $ Growth %',type:'scatter',mode:'lines+markers+text',text:gs.map(pL),textposition:'bottom right',textfont:{size:11,color:'#EC3E15'},line:{color:'#EC3E15',width:3,shape:'spline',smoothing:1.0},marker:{size:8,color:'#EC3E15'},connectgaps:true},
+    {x,y:whs,name:'WHS $ Growth % (APO)',type:'scatter',mode:'lines+markers+text',text:whs.map(pL),textposition:'bottom center',textfont:{size:11,color:'#00B050'},line:{color:'#00B050',width:3,shape:'spline',smoothing:1.0},marker:{size:8,color:'#00B050'},connectgaps:false},
+  ],{
+    paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{family:"'Helvetica Neue',Helvetica,Arial,sans-serif",color:'#222',size:12},
+    margin:{t:40,r:40,b:50,l:60},
+    xaxis:{showgrid:false,zeroline:false,categoryorder:isGate?'array':undefined,categoryarray:isGate?G:undefined,tickfont:{size:11}},
+    yaxis:{showgrid:true,gridcolor:'#E0E0E0',zeroline:true,zerolinecolor:'#999',ticksuffix:'%',title:{text:'Growth Rate %',font:{size:12}}},
+    legend:{orientation:'h',y:1.12,x:0.5,xanchor:'center'},autosize:true
+  },{responsive:true,displayModeBar:false});
+}
+setupBrandBtns('[data-gr-brand]',btn=>{APP.grBrand=btn.dataset.grBrand;},initGr);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WF TAB (Waterfall)
+   ═══════════════════════════════════════════════════════════════════════════ */
+function initWf(){
+  const d=APP.data;if(!d)return;
+  const brand=APP.wfBrand;
+  const D=d.u;
+  const seasons=new Set(),geos=new Set(),sports=new Set();
+  D.forEach(r=>{
+    if(r.b!==brand)return;
+    if(r.s)seasons.add(r.s);
+    if(r.geo)geos.add(r.geo);
+    if(brand==='Jordan'){const sp=jordanSportDetail(r.gsf,r.con);if(sp)sports.add(sp);}
+    else{if(r.gsf)sports.add(r.gsf);}
+  });
+  if(brand==='Jordan'){let h=false;FBAT_SET.forEach(s=>{if(sports.has(s))h=true;});if(h)sports.add('FBAT');}
+  const seasonList=[...seasons].sort(seasonCmp);
+  const pin=getDefaultPreselectSeasons(d).find(s=>seasons.has(s));
+  if(!APP.wfSeason||!seasons.has(APP.wfSeason))APP.wfSeason=pin||seasonList[seasonList.length-1];
+  const geoList=['ALL',...[...geos].sort()];
+  if(!APP.wfGeo)APP.wfGeo='ALL';
+  const sportList=brand==='Jordan'?['Kids','Streetwear','Basketball','Golf','FBAT'].filter(s=>sports.has(s)):[...sports].filter(Boolean).sort();
+
+  buildFilterSet('wfFilters',[
+    {id:'season',label:'Season',type:'select',values:seasonList.map(s=>[s,s]),defaultVal:APP.wfSeason},
+    {id:'geo',label:'Geo',type:'select',values:geoList.map(g=>[g,g]),defaultVal:APP.wfGeo},
+    {id:'metric',label:'Metric',type:'select',values:[['w','GLB WHS $'],['q','DP Quantity']],defaultVal:APP.wfMetric},
+    {id:'sport',label:'Sport',values:sportList,preselect:[]},
+  ],renderWf);
+  renderWf();
+}
+function renderWf(){
+  const d=APP.data;if(!d)return;
+  const D=d.u,brand=APP.wfBrand;
+  const selSeason=document.getElementById('wfFilters_season');
+  const selGeo=document.getElementById('wfFilters_geo');
+  const selMetric=document.getElementById('wfFilters_metric');
+  if(selSeason)APP.wfSeason=selSeason.value;
+  if(selGeo)APP.wfGeo=selGeo.value;
+  if(selMetric)APP.wfMetric=selMetric.value;
+  const season=APP.wfSeason,geo=APP.wfGeo,METRIC=APP.wfMetric;
+  const fSp=getF('wfFilters','sport');
+
+  if(!season)return;
+
+  // Find latest gate
+  const availGates={};
+  D.forEach(r=>{if(r.b===brand&&r.s===season&&(geo==='ALL'||r.geo===geo)&&r.g&&r.g!=='LY')availGates[r.g]=true;});
+  let gate=null;for(let i=G.length-1;i>=0;i--)if(availGates[G[i]]){gate=G[i];break;}
+  if(!gate)gate=G[0];
+
+  const NIKE_SPORT_ORDER=['Running','Training','Basketball','Global Football','Sportswear','Kids','ACG','Tennis','Golf','Skate','NikeSkims','American Football','Baseball','Specialty Sports','Cricket'];
+  const JORDAN_SPORT_ORDER=['Kids','Streetwear','Basketball','Golf','FBAT'];
+
+  function aggBySport(s,g){
+    const result={};
+    D.forEach(r=>{
+      if(r.b!==brand||r.s!==s||(geo!=='ALL'&&r.geo!==geo)||r.g!==g)return;
+      if(fSp&&fSp.length>0){
+        if(brand==='Jordan'){const sp=jordanSportDetail(r.gsf,r.con);if(!sp||!spMatch(fSp,wfSport(r),brand))return;}
+        else{if(!fSp.includes(r.gsf))return;}
+      }
+      const sp=wfSport(r);if(!sp)return;
+      if(!result[sp])result[sp]={q:0,w:0};
+      result[sp].q+=(r.q||0);result[sp].w+=(r.w||0);
+    });
+    return result;
+  }
+
+  const curBySport=aggBySport(season,gate);
+  const ps=priorSeason(season);
+  const lyBySport=ps?{}:{};
+  if(ps){
+    D.forEach(r=>{
+      if(r.b!==brand||r.s!==ps||(geo!=='ALL'&&r.geo!==geo)||r.g!=='LY')return;
+      const sp=wfSport(r);if(!sp)return;
+      if(!lyBySport[sp])lyBySport[sp]={q:0,w:0};
+      lyBySport[sp].q+=(r.q||0);lyBySport[sp].w+=(r.w||0);
+    });
+  }
+
+  const sportOrder=brand==='Jordan'?JORDAN_SPORT_ORDER:NIKE_SPORT_ORDER;
+  const allSp={...curBySport,...lyBySport};
+  const sports=Object.keys(allSp).filter(sp=>(curBySport[sp]||{})[METRIC]||(lyBySport[sp]||{})[METRIC]).sort((a,b)=>{const ai=sportOrder.indexOf(a),bi=sportOrder.indexOf(b);if(ai===-1&&bi===-1)return a.localeCompare(b);if(ai===-1)return 1;if(bi===-1)return -1;return ai-bi;});
+
+  const changes=sports.map(sp=>({sp,cur:(curBySport[sp]||{})[METRIC]||0,ly:(lyBySport[sp]||{})[METRIC]||0,chg:((curBySport[sp]||{})[METRIC]||0)-((lyBySport[sp]||{})[METRIC]||0)})).filter(d=>d.cur||d.ly);
+  const lyTotal=changes.reduce((s,d)=>s+d.ly,0);
+  const curTotal=changes.reduce((s,d)=>s+d.cur,0);
+  const lyLabel=ps?ps+' (F4)':'LY';
+  const fmtV=METRIC==='w'?fmtD:fmt;
+
+  // Summary cards
+  const chgVal=curTotal-lyTotal;
+  const chgColor=chgVal>=0?'var(--green)':'var(--red)';
+  document.getElementById('wfCards').innerHTML=[
+    [lyLabel,fmtV(lyTotal),'#555'],[gate,fmtV(curTotal),'#156082'],
+    ['vs PY Chg',(chgVal>=0?'+':'')+fmtV(chgVal),chgColor],['vs PY %',pctStr(curTotal,lyTotal).replace(/<[^>]+>/g,''),chgColor]
+  ].map(c=>'<div class="card"><div class="c-label">'+c[0]+'</div><div class="c-value" style="color:'+c[2]+'">'+c[1]+'</div></div>').join('');
+
+  document.getElementById('wfChartTitle').textContent=(geo==='ALL'?'Global':geo)+' '+season+' ('+gate+') vs '+lyLabel+' — '+(METRIC==='w'?'GLB WHS $':'DP Quantity');
+
+  // AI Insights
+  (function(){
+    const el=document.getElementById('wfAiInsights');if(!el)return;
+    const items=[];const isDollar=METRIC==='w';const metLabel=isDollar?'WHS $':'DP Qty';
+    if(lyTotal&&curTotal){
+      const pctChg=((curTotal-lyTotal)/Math.abs(lyTotal))*100;
+      items.push(brand+' '+(geo==='ALL'?'Global':geo)+' '+season+' '+metLabel+' at '+gate+' is '+_aiHL(_aiFmtVal(curTotal,isDollar))+', '+_aiPct(pctChg)+' vs '+lyLabel+'.');
+    }
+    const gainers=changes.filter(d=>d.chg>0).sort((a,b)=>b.chg-a.chg);
+    const drainers=changes.filter(d=>d.chg<0).sort((a,b)=>a.chg-b.chg);
+    if(gainers.length>0){const top=gainers[0];items.push('Largest gainer: '+_aiHL(top.sp)+' contributing +'+(isDollar?'$':'')+_aiFmtVal(Math.abs(top.chg),false)+' — key growth driver for the season.');}
+    if(drainers.length>0){const top=drainers[0];items.push('Largest drainer: '+_aiHL(top.sp)+' declining '+(isDollar?'$':'')+_aiFmtVal(Math.abs(top.chg),false)+' — assess whether marketplace pull-back is strategic.');}
+    if(gainers.length>0&&drainers.length>0){
+      const totalGain=gainers.reduce((s,d)=>s+d.chg,0),totalDrain=drainers.reduce((s,d)=>s+Math.abs(d.chg),0);
+      if(totalGain>totalDrain)items.push('Net positive: gains ('+_aiFmtVal(totalGain,isDollar)+') outpace drains ('+_aiFmtVal(totalDrain,isDollar)+').');
+      else items.push('Net negative: drains ('+_aiFmtVal(totalDrain,isDollar)+') exceed gains ('+_aiFmtVal(totalGain,isDollar)+') — flag for leadership.');
+    }
+    if(items.length===0)items.push('Select a season, geo, and metric to view waterfall insights.');
+    el.innerHTML=_aiWrap(items,'Waterfall breakdown comparing current gate vs Last Year by sport.');
+  })();
+
+  // Waterfall chart
+  const labels=[lyLabel+' Total'];
+  const measure=['absolute'];
+  const y=[lyTotal];
+  const text=[fmtV(lyTotal)];
+  changes.filter(d=>d.chg!==0).forEach(d=>{labels.push(d.sp);measure.push('relative');y.push(d.chg);text.push((d.chg>=0?'+':'')+fmtV(d.chg));});
+  labels.push(gate+' Total');measure.push('total');y.push(curTotal);text.push(fmtV(curTotal));
+
+  // Compute waterfall running totals for Y-axis range
+  var wfRunning=lyTotal,wfMin=lyTotal,wfMax=lyTotal;
+  changes.filter(d=>d.chg!==0).forEach(d=>{wfRunning+=d.chg;if(wfRunning<wfMin)wfMin=wfRunning;if(wfRunning>wfMax)wfMax=wfRunning;});
+  if(curTotal<wfMin)wfMin=curTotal;if(curTotal>wfMax)wfMax=curTotal;
+  if(lyTotal<wfMin)wfMin=lyTotal;if(lyTotal>wfMax)wfMax=lyTotal;
+  const wfPad=50000000;
+  const wfYMin=wfMin-wfPad,wfYMax=wfMax+wfPad;
+
+  // Y-axis tick format: #,###.0,,"Mu"
+  function wfTickLabel(v){var m=v/1e6;var s=m.toFixed(1);var p=s.split('.');var intPart=p[0],decPart=p[1];var neg=false;if(intPart.charAt(0)==='-'){neg=true;intPart=intPart.slice(1);}var result='';var len=intPart.length;for(var ci=0;ci<len;ci++){if(ci>0&&(len-ci)%3===0)result+=',';result+=intPart[ci];}return(neg?'-':'')+result+'.'+decPart+'Mu';}
+  var wfNiceSteps=[1e6,2e6,5e6,10e6,20e6,50e6,100e6,200e6,500e6,1e9];
+  var wfNiceStep=wfNiceSteps[wfNiceSteps.length-1];
+  for(var wsi=0;wsi<wfNiceSteps.length;wsi++){if((wfYMax-wfYMin)/wfNiceSteps[wsi]<=10){wfNiceStep=wfNiceSteps[wsi];break;}}
+  var wfTickVals=[],wfTickTexts=[];
+  var wfStart=Math.floor(wfYMin/wfNiceStep)*wfNiceStep;
+  for(var tv=wfStart;tv<=wfYMax+wfNiceStep;tv+=wfNiceStep){wfTickVals.push(tv);wfTickTexts.push(wfTickLabel(tv));}
+
+  Plotly.react('wfChart',[{
+    type:'waterfall',orientation:'v',measure,x:labels,y,text,textposition:'outside',
+    textfont:{size:11,color:'#222'},connector:{line:{color:'#B0B0B0',width:1,dash:'dot'}},
+    increasing:{marker:{color:'#00B050'}},decreasing:{marker:{color:'#FF0000'}},totals:{marker:{color:'#156082'}},
+    cliponaxis:false,hovertemplate:'<b>%{x}</b><br>%{y:,.0f}<extra></extra>'
+  }],{
+    paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{family:"'Helvetica Neue',Helvetica,Arial,sans-serif",color:'#222',size:11},
+    margin:{t:40,r:40,b:100,l:110},
+    xaxis:{showgrid:false,tickangle:-35,linecolor:'#D0D0D0',tickfont:{size:10}},
+    yaxis:{showgrid:true,gridcolor:'#eee',zeroline:true,zerolinecolor:'#ccc',range:[wfYMin,wfYMax],tickvals:wfTickVals,ticktext:wfTickTexts},
+    showlegend:false,autosize:true
+  },{responsive:true,displayModeBar:false});
+
+  // Sport detail table
+  document.getElementById('wfTableTitle').textContent='Sport Detail — '+season+' '+gate+' vs '+lyLabel;
+  let tbl='<table class="dt"><thead><tr><th>Sport</th><th>'+lyLabel+'</th><th>'+gate+'</th><th>Change</th><th>% Chg</th></tr></thead><tbody>';
+  changes.forEach(d=>{
+    const chgCls=d.chg>=0?'pos':'neg';
+    tbl+='<tr><td>'+d.sp+'</td><td>'+fmtV(d.ly)+'</td><td>'+fmtV(d.cur)+'</td><td><span class="'+chgCls+'">'+(d.chg>=0?'+':'')+fmtV(d.chg)+'</span></td><td>'+pctStr(d.cur,d.ly)+'</td></tr>';
+  });
+  tbl+='<tr class="total-row"><td>Total</td><td>'+fmtV(lyTotal)+'</td><td>'+fmtV(curTotal)+'</td><td>'+fmtDchg(chgVal)+'</td><td>'+pctStr(curTotal,lyTotal)+'</td></tr>';
+  tbl+='</tbody></table>';
+  document.getElementById('wfTableWrap').innerHTML=tbl;
+  renderWfTop10();
+}
+function renderWfTop10(){
+  const d=APP.data;if(!d)return;
+  const D=d.u,brand=APP.wfBrand;
+  const season=APP.wfSeason,geo=APP.wfGeo,METRIC=APP.wfMetric;
+  const mode=APP.wfTop10Mode||'fr';
+  if(!season)return;
+
+  // Toggle button styling
+  const btnFr=document.getElementById('wfTop10BtnFr'),btnMc=document.getElementById('wfTop10BtnMc');
+  if(btnFr){btnFr.classList.toggle('active-toggle',mode==='fr');btnFr.style.background=mode==='fr'?'var(--accent)':'#fff';btnFr.style.color=mode==='fr'?'#fff':'var(--text)';}
+  if(btnMc){btnMc.classList.toggle('active-toggle',mode==='mc');btnMc.style.background=mode==='mc'?'var(--accent)':'#fff';btnMc.style.color=mode==='mc'?'#fff':'var(--text)';}
+
+  // Find latest gate
+  const availGates={};
+  D.forEach(r=>{if(r.b===brand&&r.s===season&&(geo==='ALL'||r.geo===geo)&&r.g&&r.g!=='LY')availGates[r.g]=true;});
+  let curGate=null;for(let i=G.length-1;i>=0;i--)if(availGates[G[i]]){curGate=G[i];break;}
+  if(!curGate)return;
+
+  const ps=priorSeason(season);
+  const metLbl=METRIC==='w'?'GLB WHS $':'DP Quantity';
+
+  // Aggregate current by franchise/merch class
+  const curAgg={};
+  D.forEach(r=>{
+    if(r.b!==brand||r.s!==season||(geo!=='ALL'&&r.geo!==geo)||r.g!==curGate)return;
+    const key=mode==='fr'?(r.fr||'No Franchise'):(r.mc||'No Merch Class');
+    if(!key)return;
+    curAgg[key]=(curAgg[key]||0)+(r[METRIC]||0);
+  });
+
+  const pyAgg={};
+  if(ps){
+    D.forEach(r=>{
+      if(r.b!==brand||r.s!==ps||(geo!=='ALL'&&r.geo!==geo)||r.g!=='LY')return;
+      const key=mode==='fr'?(r.fr||'No Franchise'):(r.mc||'No Merch Class');
+      if(!key)return;
+      pyAgg[key]=(pyAgg[key]||0)+(r[METRIC]||0);
+    });
+  }
+
+  const allKeys=Object.keys(curAgg).filter(k=>curAgg[k]>0).sort((a,b)=>curAgg[b]-curAgg[a]);
+  const top10=allKeys.slice(0,10);
+  if(!top10.length){Plotly.purge('wfTop10Chart');return;}
+
+  const curVals=top10.map(k=>curAgg[k]||0);
+  const pyVals=top10.map(k=>pyAgg[k]||0);
+  const fmtV=METRIC==='w'?fmtD:fmt;
+
+  const curLabels=top10.map((k,i)=>{
+    const cur=curVals[i],py=pyVals[i];
+    const valStr=fmtV(cur);
+    if(py&&py!==0){const pct=(cur-py)/Math.abs(py)*100;return valStr+'  '+(pct>=0?'+':'')+pct.toFixed(1)+'% vPY';}
+    return valStr;
+  });
+  const barColors=top10.map((k,i)=>{const cur=curVals[i],py=pyVals[i];if(!py||py===0)return'#AAAAAA';return cur>=py?'#00B050':'#FF0000';});
+
+  const titleEl=document.getElementById('wfTop10Title');
+  const groupLabel=mode==='fr'?'Franchise':'Merch Class';
+  if(titleEl)titleEl.textContent='Top 10 '+groupLabel+' \u2014 '+(geo==='ALL'?'Global':geo)+' '+season+' ('+curGate+') vs '+(ps||'PY')+' F4 | '+metLbl;
+
+  Plotly.react('wfTop10Chart',[
+    {type:'bar',name:(ps||'PY')+' F4',x:top10,y:pyVals,marker:{color:'#CCCCCC'},width:0.65,hovertemplate:'%{x}<br>PY F4: %{y:,.0f}<extra></extra>',showlegend:true},
+    {type:'bar',name:season+' '+curGate,x:top10,y:curVals,marker:{color:barColors},width:0.38,text:curLabels,textposition:'outside',textfont:{size:10,color:'#222'},hovertemplate:'%{x}<br>'+season+': %{y:,.0f}<extra></extra>',showlegend:true}
+  ],{
+    barmode:'overlay',paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',
+    font:{family:"'Helvetica Neue',Helvetica,Arial,sans-serif",color:'#222',size:11},margin:{t:30,r:20,b:120,l:60},
+    xaxis:{tickangle:-35,tickfont:{size:10},showgrid:false,zeroline:false,automargin:true},
+    yaxis:{showgrid:true,gridcolor:'#E8E8E8',zeroline:true,zerolinecolor:'#BBB',tickformat:METRIC==='w'?'$.3s':'.3s',title:{text:metLbl,font:{size:11}}},
+    legend:{orientation:'h',x:0.5,xanchor:'center',y:1.08},autosize:true
+  },{responsive:true,displayModeBar:false});
+}
+setupBrandBtns('[data-wf-brand]',btn=>{APP.wfBrand=btn.dataset.wfBrand;APP.wfSeason=null;},initWf);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EXECUTIVE OVERVIEW
+   ═══════════════════════════════════════════════════════════════════════════ */
+function _execBrandLong(){return APP.execBrand==='Jordan'?'Jordan Brand':'Nike Brand';}
+
+function _execMatchOp(r){
+  const brand=_execBrandLong();
+  const fSn=getFSet('execFilters','season'),fGe=getFSet('execFilters','geo'),fDv=getFSet('execFilters','div');
+  const fSb=getFSet('execFilters','sb'),fSp=getF('execFilters','sport'),fCo=getFSet('execFilters','con');
+  if(r.b!==brand)return false;
+  if(fSn&&!fSn.has(r.s))return false;
+  if(fGe&&!fGe.has(r.g))return false;
+  if(fDv&&!fDv.has(r.d))return false;
+  if(fSb&&!fSb.has(r.sb))return false;
+  if(!spMatch(fSp,r.msp,brand))return false;
+  if(fCo&&!fCo.has(r.con))return false;
+  return true;
+}
+function _execMatchOpInc(r){
+  const fSn=getFSet('execFilters','season'),fGe=getFSet('execFilters','geo'),fDv=getFSet('execFilters','div');
+  const fSb=getFSet('execFilters','sb'),fSp=getF('execFilters','sport'),fCo=getFSet('execFilters','con');
+  if(r.b!=='Nike Brand'&&r.b!=='Jordan Brand')return false;
+  if(fSn&&!fSn.has(r.s))return false;
+  if(fGe&&!fGe.has(r.g))return false;
+  if(fDv&&!fDv.has(r.d))return false;
+  if(fSb&&!fSb.has(r.sb))return false;
+  const b=r.b==='Jordan Brand'?'Jordan Brand':'Nike Brand';
+  if(!spMatch(fSp,r.msp,b))return false;
+  if(fCo&&!fCo.has(r.con))return false;
+  return true;
+}
+function _execDpLatestGateMap(brand){
+  const DP=(APP.data.dp||[]).filter(r=>r.b===brand);
+  const dpSeasons=new Set(DP.map(r=>r.s));
+  const lg={};
+  dpSeasons.forEach(s=>{
+    const gatesWithData=new Set();
+    const gatesAny=new Set();
+    DP.forEach(r=>{if(r.s===s){gatesAny.add(r.gt);if((r.adp||0)!==0||(r.afpd||0)!==0)gatesWithData.add(r.gt);}});
+    const pool=gatesWithData.size>0?gatesWithData:gatesAny;
+    let best=-1,bestG=null;
+    pool.forEach(g=>{const idx=FULL_GATE_IDX[g];if(idx!=null&&idx>best){best=idx;bestG=g;}});
+    if(bestG)lg[s]=bestG;else if(pool.size>0)lg[s]=[...pool][0];
+  });
+  return lg;
+}
+function _execMatchDp(r,brand){
+  const lg=_execDpLatestGateMap(brand);
+  const fSn=getFSet('execFilters','season'),fGe=getFSet('execFilters','geo'),fDv=getFSet('execFilters','div');
+  const fSb=getFSet('execFilters','sb'),fSp=getF('execFilters','sport'),fCo=getFSet('execFilters','con');
+  if(r.b!==brand)return false;
+  if(fSn&&!fSn.has(r.s))return false;
+  if(lg[r.s]!==r.gt)return false;
+  if(fGe&&!fGe.has(r.g))return false;
+  if(fDv&&!fDv.has(r.d))return false;
+  if(fSb&&!fSb.has(r.sb))return false;
+  if(!spMatch(fSp,r.msp,brand))return false;
+  if(fCo&&!fCo.has(r.con))return false;
+  return true;
+}
+function _execDpPyRows(brand){
+  const DP=APP.data.dp||[];
+  const fSn=getFSet('execFilters','season'),fGe=getFSet('execFilters','geo'),fDv=getFSet('execFilters','div');
+  const fSb=getFSet('execFilters','sb'),fSp=getF('execFilters','sport'),fCo=getFSet('execFilters','con');
+  const seasons=fSn?[...fSn]:[...new Set(DP.filter(r=>r.b===brand).map(r=>r.s))];
+  const pySeas=new Set();seasons.forEach(s=>{const p=priorSeason(s);if(p)pySeas.add(p);});
+  const latestGateAll=pickLatestGate(DP,brand,new Set(DP.map(r=>r.s)));
+  return DP.filter(r=>{
+    if(r.b!==brand||!pySeas.has(r.s))return false;
+    if(latestGateAll[r.s]!==r.gt)return false;
+    if(fGe&&!fGe.has(r.g))return false;
+    if(fDv&&!fDv.has(r.d))return false;
+    if(fSb&&!fSb.has(r.sb))return false;
+    if(!spMatch(fSp,r.msp,brand))return false;
+    if(fCo&&!fCo.has(r.con))return false;
+    return true;
+  });
+}
+
+function _sumOpFld(rows,f){let t=0;rows.forEach(r=>{t+=r[f]||0;});return t;}
+/**
+ * OP + DP KPIs — same rules as Demand Plan HTML OPDP getVal():
+ * - OP SR: ty = sum(sr), py = sum(srP) on the same filtered rows (f / fP).
+ * - APO ADP: ty = sum(adp) on latest-gate dp rows; py = sum(adp) on dpPY (prior season @ F4).
+ */
+function _kpiFromOp(opRows, dpRows, dpPyRows){
+  const srTot=_sumOpFld(opRows,'sr');
+  const srPrior=_sumOpFld(opRows,'srP');
+  const adpTot=dpRows.reduce((s,r)=>s+(r.adp||0),0);
+  const adpPy=dpPyRows.reduce((s,r)=>s+(r.adp||0),0);
+  return {srTot,srPrior,adpTot,adpPy};
+}
+function _execKpiSkeletonHtml(){
+  const card='<div class="exec-kpi-skel-card"><div class="exec-kpi-skel-line short"></div><div class="exec-kpi-skel-line"></div><div class="exec-kpi-skel-line tall"></div><div class="exec-kpi-skel-line"></div></div>';
+  return '<div class="exec-kpi-section"><div class="exec-kpi-section-title">Loading</div><div class="exec-kpi-grid">'+Array(12).fill(card).join('')+'</div></div>';
+}
+function _execKpiCard(title,k){
+  const pSr=pctNum(k.srTot,k.srPrior),pAdp=pctNum(k.adpTot,k.adpPy);
+  const pctHtml=function(v){if(v==null||isNaN(v))return'—';return'<span class="'+(v>=0?'pos':'neg')+'">'+(v>=0?'+':'')+v.toFixed(1)+'%</span>';};
+  return '<div class="exec-kpi-card"><h4>'+title+'</h4>'
+    +'<div class="exec-kpi-metric"><div class="exec-kpi-label">Seasonal Revenue (from OP Submit)</div><div class="exec-kpi-val">'+fmtD(k.srTot)+'</div>'
+    +'<div class="exec-kpi-sub">v PY: '+pctHtml(pSr)+' <span style="color:#64748b;font-size:0.62rem">(OPDP · ∑sr vs ∑srP)</span></div></div>'
+    +'<div class="exec-kpi-metric"><div class="exec-kpi-label">Unit Investment (total units)</div><div class="exec-kpi-val">'+fmtU(k.adpTot)+'</div>'
+    +'<div class="exec-kpi-sub">v PY: '+pctHtml(pAdp)+' <span style="color:#64748b;font-size:0.62rem">(APO · ADP vs prior-season F4)</span></div></div></div>';
+}
+
+function updateExecHeroKpis(){
+  const el=document.getElementById('execHeroKpi');
+  if(!el||!APP.data)return;
+  const OP=APP.data.op||[];const brandN='Nike Brand',brandJ='Jordan Brand';
+  const fOPinc=OP.filter(_execMatchOpInc);
+  const DP=APP.data.dp||[];
+  const dpInc=DP.filter(r=>(r.b===brandN||r.b===brandJ)&&_execMatchDp(r,r.b));
+  const pyInc=_execDpPyRows(brandN).concat(_execDpPyRows(brandJ));
+  const k=_kpiFromOp(fOPinc,dpInc,pyInc);
+  const pSr=pctNum(k.srTot,k.srPrior),pAdp=pctNum(k.adpTot,k.adpPy);
+  const pctH=function(v){if(v==null||isNaN(v))return'—';return'<span class="'+(v>=0?'pos':'neg')+'">'+(v>=0?'+':'')+v.toFixed(1)+'%</span>';};
+  el.innerHTML='<div class="kpi"><div class="kpi-label">Total Seasonal Revenue</div><div class="kpi-value">'+fmtD(k.srTot)+'</div><div class="kpi-sub neutral">OP Submit</div></div>'
+    +'<div class="kpi"><div class="kpi-label">Seasonal Revenue vs PY</div><div class="kpi-value" style="font-size:1.1rem">'+pctH(pSr)+'</div><div class="kpi-sub neutral">∑sr vs ∑srP</div></div>'
+    +'<div class="kpi"><div class="kpi-label">Total Unit Investment (units)</div><div class="kpi-value">'+fmtU(k.adpTot)+'</div><div class="kpi-sub neutral">APO · latest gate</div></div>'
+    +'<div class="kpi"><div class="kpi-label">Unit Investment vs PY</div><div class="kpi-value" style="font-size:1.1rem">'+pctH(pAdp)+'</div><div class="kpi-sub neutral">vs prior F4</div></div>';
+}
+
+function renderExecKpis(){
+  const mount=document.getElementById('execKpiMount');if(!mount||!APP.data)return;
+  const OP=APP.data.op||[];const brandN='Nike Brand',brandJ='Jordan Brand';
+  const fOPn=OP.filter(_execMatchOpInc).filter(r=>r.b===brandN);
+  const fOPj=OP.filter(_execMatchOpInc).filter(r=>r.b===brandJ);
+  const DP=APP.data.dp||[];
+  const dpn=DP.filter(r=>_execMatchDp(r,brandN));
+  const dpj=DP.filter(r=>_execMatchDp(r,brandJ));
+  const pyN=_execDpPyRows(brandN),pyJ=_execDpPyRows(brandJ);
+
+  let h='';
+  h+='<div class="exec-kpi-section"><div class="exec-kpi-section-title">Nike Brand &amp; Jordan Brand</div><div class="exec-kpi-grid">';
+  h+=_execKpiCard('Nike Brand',_kpiFromOp(fOPn,dpn,pyN));
+  h+=_execKpiCard('Jordan Brand',_kpiFromOp(fOPj,dpj,pyJ));
+  h+='</div></div>';
+
+  const GEO=['NA','EMEA','GC','APLA'];
+  h+='<div class="exec-kpi-section"><div class="exec-kpi-section-title">Geography ('+APP.execBrand+')</div><div class="exec-kpi-grid">';
+  const dpB=_execBrandLong();
+  GEO.forEach(g=>{
+    const opSlice=OP.filter(r=>_execMatchOp(r)&&r.g===g);
+    const dpSlice=DP.filter(r=>_execMatchDp(r,dpB)&&r.g===g);
+    const pySlice=_execDpPyRows(dpB).filter(r=>r.g===g);
+    h+=_execKpiCard(g,_kpiFromOp(opSlice,dpSlice,pySlice));
+  });
+  h+='</div></div>';
+
+  const sports=(APP.execBrand==='Jordan'?JORDAN_SPORTS:NIKE_PRIMARY);
+  h+='<div class="exec-kpi-section"><div class="exec-kpi-section-title">Sports (primary · '+APP.execBrand+')</div><div class="exec-kpi-grid">';
+  sports.forEach(sp=>{
+    const opSlice=OP.filter(r=>{
+      if(APP.execBrand==='Jordan'){if(r.b!==brandJ||!_execMatchOp(r))return false;return spMatch([sp],r.msp,'Jordan Brand');}
+      if(r.b!==brandN||!_execMatchOp(r))return false;
+      return spMatch([sp],r.msp,'Nike Brand');
+    });
+    const dpSlice=DP.filter(r=>_execMatchDp(r,dpB)&&r.msp===sp);
+    const pySlice=_execDpPyRows(dpB).filter(r=>r.msp===sp);
+    h+=_execKpiCard(sp,_kpiFromOp(opSlice,dpSlice,pySlice));
+  });
+  h+='</div></div>';
+
+  const cons=['Mens','Womens','Kids'];
+  h+='<div class="exec-kpi-section"><div class="exec-kpi-section-title">Consumer</div><div class="exec-kpi-grid">';
+  cons.forEach(cn=>{
+    const opSlice=OP.filter(r=>_execMatchOp(r)&&r.con===cn);
+    const dpSlice=DP.filter(r=>_execMatchDp(r,dpB)&&r.con===cn);
+    const pySlice=_execDpPyRows(dpB).filter(r=>r.con===cn);
+    h+=_execKpiCard(cn,_kpiFromOp(opSlice,dpSlice,pySlice));
+  });
+  h+='</div></div>';
+
+  const PE=[['FW','FOOTWEAR'],['AP','APPAREL'],['ACC','EQUIPMENT']];
+  h+='<div class="exec-kpi-section"><div class="exec-kpi-section-title">Product Engine</div><div class="exec-kpi-grid">';
+  PE.forEach(([code,lbl])=>{
+    const opSlice=OP.filter(r=>_execMatchOp(r)&&r.d===code);
+    const dpSlice=DP.filter(r=>_execMatchDp(r,dpB)&&r.d===code);
+    const pySlice=_execDpPyRows(dpB).filter(r=>r.d===code);
+    h+=_execKpiCard(lbl,_kpiFromOp(opSlice,dpSlice,pySlice));
+  });
+  h+='</div></div>';
+
+  mount.innerHTML=h;
+}
+
+function renderExecGr(){
+  const d=APP.data;if(!d)return;
+  const D=d.u||[],OP=d.op||[],brand=APP.execBrand;
+  const fSn=getFSet('execFilters','season'),fGe=getFSet('execFilters','geo'),fDv=getFSet('execFilters','div');
+  const fSb=getFSet('execFilters','sb'),fSp=getF('execFilters','sport');
+  const opBrand=brand==='Nike'?'Nike Brand':'Jordan Brand';
+
+  function matchD(r){
+    if(r.g==='LY')return false;
+    if(r.b!==brand)return false;
+    if(fSn&&!fSn.has(r.s))return false;
+    if(fGe&&!fGe.has(r.geo))return false;
+    if(fDv&&!fDv.has(r.div))return false;
+    if(fSb&&!fSb.has(r.sb))return false;
+    if(fSp&&fSp.length>0){
+      if(brand==='Jordan'){const sp=jordanSportDetail(r.gsf,r.con);if(!sp)return false;if(!spMatch(fSp,sp,opBrand))return false;}
+      else{if(!fSp.includes(r.gsf))return false;}
+    }
+    return true;
+  }
+  const srBySeason={};
+  OP.filter(r=>r.b===opBrand).forEach(r=>{
+    if(!srBySeason[r.s])srBySeason[r.s]={sr:0,srP:0,gs:0,gsP:0};
+    srBySeason[r.s].sr+=(r.sr||0);srBySeason[r.s].srP+=(r.srP||0);
+    srBySeason[r.s].gs+=(r.fpd||0);srBySeason[r.s].gsP+=(r.fpdP||0);
+  });
+
+  const allSeasons=[...new Set(D.map(r=>r.s).filter(Boolean))].sort(seasonCmp);
+  let selected=fSn?[...fSn].sort(seasonCmp):allSeasons;
+  selected=selected.filter(seasonPassesCal2026);
+  if(selected.length===0)selected=allSeasons.filter(seasonPassesCal2026);
+
+  const whsByGate={};
+  D.filter(matchD).forEach(r=>{const k=r.s+'|'+r.g;whsByGate[k]=(whsByGate[k]||0)+(r.w||0);});
+  function latestWHS(s){for(let i=G.length-1;i>=0;i--){const k=s+'|'+G[i];if(whsByGate[k])return whsByGate[k];}return 0;}
+
+  const xLabels=[],srGrowth=[],gsGrowth=[],whsGrowth=[];
+  selected.forEach(s=>{
+    const ps=priorSeason(s);
+    const sr=srBySeason[s],srP_s=srBySeason[ps];
+    const srCur=sr?sr.sr:0,srPr=sr?sr.srP:0;
+    const gsCur=sr?sr.gs:0,gsPr=sr?sr.gsP:0;
+    const whsCur=latestWHS(s),whsPr=ps?latestWHS(ps):0;
+    xLabels.push(s);
+    srGrowth.push(srPr?((srCur-srPr)/Math.abs(srPr)*100):null);
+    gsGrowth.push(gsPr?((gsCur-gsPr)/Math.abs(gsPr)*100):null);
+    whsGrowth.push(whsCur&&whsPr?((whsCur-whsPr)/Math.abs(whsPr)*100):null);
+  });
+  grPlotInto('execGrChart',xLabels,srGrowth,gsGrowth,whsGrowth,false);
+}
+
+function renderExecWf(){
+  const d=APP.data;if(!d)return;
+  const D=d.u,brand=APP.execBrand;
+  const seasonList=[...new Set(D.filter(r=>r.b===brand).map(r=>r.s))].sort(seasonCmp).filter(seasonPassesCal2026);
+  const fSn=getFSet('execFilters','season');
+  let pool=fSn?[...fSn].filter(s=>seasonPassesCal2026(s)):seasonList;
+  if(pool.length===0)pool=seasonList;
+  const season=pool.length?pool[pool.length-1]:null;
+  const geo='ALL',METRIC='w';
+  if(!season){Plotly.purge('execWfChart');return;}
+
+  const availGates={};
+  D.forEach(r=>{if(r.b===brand&&r.s===season&&(geo==='ALL'||r.geo===geo)&&r.g&&r.g!=='LY')availGates[r.g]=true;});
+  let gate=null;for(let i=G.length-1;i>=0;i--)if(availGates[G[i]]){gate=G[i];break;}
+  if(!gate)gate=G[0];
+
+  const NIKE_SPORT_ORDER=['Running','Training','Basketball','Global Football','Sportswear','Kids','ACG','Tennis','Golf','Skate','NikeSkims','American Football','Baseball','Specialty Sports','Cricket'];
+  const JORDAN_SPORT_ORDER=['Kids','Streetwear','Basketball','Golf','FBAT'];
+
+  function aggBySport(s,g){
+    const result={};
+    D.forEach(r=>{
+      if(r.b!==brand||r.s!==s||(geo!=='ALL'&&r.geo!==geo)||r.g!==g)return;
+      const sp=wfSport(r);if(!sp)return;
+      if(!result[sp])result[sp]={q:0,w:0};
+      result[sp].q+=(r.q||0);result[sp].w+=(r.w||0);
+    });
+    return result;
+  }
+  const curBySport=aggBySport(season,gate);
+  const ps=priorSeason(season);
+  const lyBySport={};
+  if(ps){
+    D.forEach(r=>{
+      if(r.b!==brand||r.s!==ps||(geo!=='ALL'&&r.geo!==geo)||r.g!=='LY')return;
+      const sp=wfSport(r);if(!sp)return;
+      if(!lyBySport[sp])lyBySport[sp]={q:0,w:0};
+      lyBySport[sp].q+=(r.q||0);lyBySport[sp].w+=(r.w||0);
+    });
+  }
+  const sportOrder=brand==='Jordan'?JORDAN_SPORT_ORDER:NIKE_SPORT_ORDER;
+  const allSp={...curBySport,...lyBySport};
+  const sports=Object.keys(allSp).filter(sp=>(curBySport[sp]||{})[METRIC]||(lyBySport[sp]||{})[METRIC]).sort((a,b)=>{const ai=sportOrder.indexOf(a),bi=sportOrder.indexOf(b);if(ai===-1&&bi===-1)return a.localeCompare(b);if(ai===-1)return 1;if(bi===-1)return -1;return ai-bi;});
+  const changes=sports.map(sp=>({sp,cur:(curBySport[sp]||{})[METRIC]||0,ly:(lyBySport[sp]||{})[METRIC]||0,chg:((curBySport[sp]||{})[METRIC]||0)-((lyBySport[sp]||{})[METRIC]||0)})).filter(d=>d.cur||d.ly);
+  const lyTotal=changes.reduce((s,x)=>s+x.ly,0);
+  const curTotal=changes.reduce((s,x)=>s+x.cur,0);
+  const lyLabel=ps?ps+' (F4)':'LY';
+  const fmtV=fmtD;
+
+  const labels=[lyLabel+' Total'];
+  const measure=['absolute'];
+  const y=[lyTotal];
+  const text=[fmtV(lyTotal)];
+  changes.filter(d=>d.chg!==0).forEach(d=>{labels.push(d.sp);measure.push('relative');y.push(d.chg);text.push((d.chg>=0?'+':'')+fmtV(d.chg));});
+  labels.push(gate+' Total');measure.push('total');y.push(curTotal);text.push(fmtV(curTotal));
+
+  var wfRunning=lyTotal,wfMin=lyTotal,wfMax=lyTotal;
+  changes.filter(d=>d.chg!==0).forEach(d=>{wfRunning+=d.chg;if(wfRunning<wfMin)wfMin=wfRunning;if(wfRunning>wfMax)wfMax=wfRunning;});
+  if(curTotal<wfMin)wfMin=curTotal;if(curTotal>wfMax)wfMax=curTotal;
+  if(lyTotal<wfMin)wfMin=lyTotal;if(lyTotal>wfMax)wfMax=lyTotal;
+  const wfPad=50000000;
+  const wfYMin=wfMin-wfPad,wfYMax=wfMax+wfPad;
+  function wfTickLabel(v){var m=v/1e6;var s=m.toFixed(1);var p=s.split('.');var intPart=p[0],decPart=p[1];var neg=false;if(intPart.charAt(0)==='-'){neg=true;intPart=intPart.slice(1);}var result='';var len=intPart.length;for(var ci=0;ci<len;ci++){if(ci>0&&(len-ci)%3===0)result+=',';result+=intPart[ci];}return(neg?'-':'')+result+'.'+decPart+'Mu';}
+  var wfNiceSteps=[1e6,2e6,5e6,10e6,20e6,50e6,100e6,200e6,500e6,1e9];
+  var wfNiceStep=wfNiceSteps[wfNiceSteps.length-1];
+  for(var wsi=0;wsi<wfNiceSteps.length;wsi++){if((wfYMax-wfYMin)/wfNiceSteps[wsi]<=10){wfNiceStep=wfNiceSteps[wsi];break;}}
+  var wfTickVals=[],wfTickTexts=[];
+  var wfStart=Math.floor(wfYMin/wfNiceStep)*wfNiceStep;
+  for(var tv=wfStart;tv<=wfYMax+wfNiceStep;tv+=wfNiceStep){wfTickVals.push(tv);wfTickTexts.push(wfTickLabel(tv));}
+
+  Plotly.react('execWfChart',[{
+    type:'waterfall',orientation:'v',measure,x:labels,y,text,textposition:'outside',
+    textfont:{size:11,color:'#222'},connector:{line:{color:'#B0B0B0',width:1,dash:'dot'}},
+    increasing:{marker:{color:'#00B050'}},decreasing:{marker:{color:'#FF0000'}},totals:{marker:{color:'#156082'}},
+    cliponaxis:false,hovertemplate:'<b>%{x}</b><br>%{y:,.0f}<extra></extra>'
+  }],{
+    paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{family:"'Helvetica Neue',Helvetica,Arial,sans-serif",color:'#222',size:11},
+    margin:{t:40,r:40,b:100,l:110},
+    xaxis:{showgrid:false,tickangle:-35,linecolor:'#D0D0D0',tickfont:{size:10}},
+    yaxis:{showgrid:true,gridcolor:'#eee',zeroline:true,zerolinecolor:'#ccc',range:[wfYMin,wfYMax],tickvals:wfTickVals,ticktext:wfTickTexts},
+    showlegend:false,autosize:true
+  },{responsive:true,displayModeBar:false});
+}
+
+function mountExecSportWc(oo){
+  const root=document.getElementById('execFilters');
+  if(!root)return;
+  const ex=document.getElementById('execSportWc');
+  if(ex)ex.remove();
+  const geo=root.querySelector('.f-geo');
+  if(!geo)return;
+  const key='execFilters_sport';
+  if(!APP._ms[key])APP._ms[key]=[];
+  const available=new Set(oo.sports||[]);
+  const fullList=NIKE_SPORTS.filter(s=>available.has(s)).concat(JORDAN_SPORTS.filter(s=>available.has(s)));
+  if(fullList.length===0)return;
+  const wrap=document.createElement('div');
+  wrap.id='execSportWc';
+  wrap.className='filter-group f-sport f-sport-wc';
+  const lbl=document.createElement('div');
+  lbl.className='filter-label';
+  lbl.textContent='Sport (Demand Plan list)';
+  wrap.appendChild(lbl);
+  const split=document.createElement('div');
+  split.className='sport-split-cols';
+  const colN=document.createElement('div');colN.className='sport-col';
+  const hN=document.createElement('div');hN.className='sport-col-hdr';hN.textContent='Nike Brand sports';
+  const rowN=document.createElement('div');rowN.className='sport-pills';
+  colN.appendChild(hN);colN.appendChild(rowN);
+  const colJ=document.createElement('div');colJ.className='sport-col';
+  const hJ=document.createElement('div');hJ.className='sport-col-hdr';hJ.textContent='Jordan Brand sports';
+  const rowJ=document.createElement('div');rowJ.className='sport-pills';
+  colJ.appendChild(hJ);colJ.appendChild(rowJ);
+  function refreshPills(){
+    const sel=APP._ms[key]||[];
+    const all=sel.length===0;
+    function updRow(row,list){
+      row.querySelectorAll('button.sport-pill').forEach(b=>{
+        const v=b.dataset.sport;
+        b.classList.toggle('active',all||sel.includes(v));
+      });
+    }
+    updRow(rowN,NIKE_SPORTS);
+    updRow(rowJ,JORDAN_SPORTS);
+  }
+  function onToggle(v){
+    let sel=APP._ms[key]||[];
+    if(sel.length===0)sel=fullList.slice();
+    const set=new Set(sel);
+    if(set.has(v)) set.delete(v); else set.add(v);
+    if(set.size===0||set.size>=fullList.length)APP._ms[key]=[];
+    else APP._ms[key]=[...set];
+    refreshPills();
+    renderExec();
+    syncExecWcModuleButtons();
+  }
+  function addPills(list,row){
+    list.forEach(sp=>{
+      if(!available.has(sp))return;
+      const b=document.createElement('button');
+      b.type='button';b.className='filter-btn sport-pill';
+      b.dataset.sport=sp;
+      b.textContent=sp;
+      b.onclick=e=>{e.stopPropagation();onToggle(sp);};
+      row.appendChild(b);
+    });
+  }
+  addPills(NIKE_SPORTS,rowN);
+  addPills(JORDAN_SPORTS,rowJ);
+  split.appendChild(colN);split.appendChild(colJ);
+  wrap.appendChild(split);
+  geo.insertAdjacentElement('afterend',wrap);
+  refreshPills();
+}
+function syncExecWcModuleButtons(){
+  document.querySelectorAll('.wc-module-btn').forEach(b=>{
+    const t=b.dataset.wcTab;
+    b.classList.toggle('active',t&&t===APP.activeTab);
+  });
+}
+
+var _execInited=false;
+function initExec(){
+  const d=APP.data;if(!d)return;
+  const oo=d.oo||{};
+  const pre=getDefaultPreselectSeasons(d);
+  const defS=pre[0]||null;
+  const keySport='execFilters_sport';
+  if(!APP._ms[keySport])APP._ms[keySport]=[];
+  buildFilterSet('execFilters',[
+    {id:'season',label:'Season (OP / APO data scope)',values:oo.seasons||[],preselect:pre},
+    {id:'geo',label:'Geography (NA, EMEA, GC, APLA)',values:oo.geos||[],preselect:[]},
+    {id:'con',label:'Consumer',values:oo.consumers||[],preselect:[]},
+    {id:'div',label:'Product Engine',values:oo.divs||[],preselect:[]},
+    {id:'sb',label:'Sub Brand',values:oo.sub_brands||[],preselect:[]},
+  ],function(){renderExec();syncExecWcModuleButtons();});
+  mountExecSportWc(oo);
+  const note=document.getElementById('execSeasonNote');
+  if(note)note.textContent='KPIs follow OPDP math (OP sum(sr) vs sum(srP); APO latest-gate ADP vs prior F4). Default season is the newest code in the latest OP + APO data drop'+(defS?(' ('+defS+')'):'')+'. m.default_season from ETL overrides when present. Charts: CY ≥ 2026.';
+  syncExecWcModuleButtons();
+  if(!_execInited){
+    document.querySelectorAll('[data-exec-brand]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        APP.execBrand=btn.dataset.execBrand;
+        document.querySelectorAll('[data-exec-brand]').forEach(b=>b.classList.toggle('active',b===btn));
+        renderExec();
+      });
+    });
+    const p=document.getElementById('execAiPanel'),tog=document.getElementById('execAiChatToggle'),cls=document.getElementById('execAiChatClose'),snd=document.getElementById('execAiSend'),inp=document.getElementById('execAiInput'),msgs=document.getElementById('execAiMsgs');
+    function openP(){if(p){p.style.display='flex';document.body.classList.add('exec-ai-open');p.setAttribute('aria-hidden','false');}}
+    function closeP(){if(p){p.style.display='none';document.body.classList.remove('exec-ai-open');p.setAttribute('aria-hidden','true');}}
+    if(tog)tog.onclick=openP;
+    if(cls)cls.onclick=closeP;
+    document.querySelectorAll('.wc-module-btn').forEach(b=>{b.addEventListener('click',e=>{e.preventDefault();if(b.dataset.wcTab)goTab(b.dataset.wcTab);});});
+    if(snd&&inp&&msgs){snd.onclick=function(){
+      const q=inp.value.trim();if(!q)return;
+      msgs.innerHTML+='<div class="exec-ai-row user">'+q.replace(/</g,'&lt;')+'</div>';
+      fetch('/api/v1/ai-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})}).then(r=>r.json()).then(j=>{
+        msgs.innerHTML+='<div class="exec-ai-row">'+(j.reply||j.detail||'No response')+'</div>';
+      }).catch(()=>{
+        msgs.innerHTML+='<div class="exec-ai-row">AIR proxy not configured. Add POST /api/v1/ai-chat with your AIR credentials.</div>';
+      });
+      inp.value='';
+    };}
+    _execInited=true;
+  }
+  renderExec();
+}
+function renderExec(){
+  try{updateExecHeroKpis();}catch(e){console.error(e);}
+  try{renderExecKpis();}catch(e){console.error(e);document.getElementById('execKpiMount').innerHTML='<div style="color:#f87171;padding:8px;">KPI build error</div>';}
+  renderExecGr();
+  renderExecWf();
+  syncExecWcModuleButtons();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INITIALIZATION
+   ═══════════════════════════════════════════════════════════════════════════ */
+async function reloadDataFromDbfs(){
+  const btn=document.getElementById('reloadDbfsBtn');
+  if(!btn)return;
+  const o=btn.textContent;
+  btn.disabled=true;
+  btn.textContent='…';
+  try{
+    const r=await fetch('/api/v1/refresh',{method:'POST'});
+    const j=await r.json().catch(function(){return{};});
+    if(!r.ok)throw new Error((j&&j.error)||(j&&j.detail)||(typeof j.detail==='string'?j.detail:'HTTP '+r.status));
+    window.location.reload();
+  }catch(e){
+    var msg='Reload failed. ';
+    if((e&&e.message)||false)msg+=e.message; else msg+=e;
+    msg+=' You can also open DevTools (F12) → Console on this page and run: fetch("/api/v1/refresh",{method:"POST"}).then(r=>r.json()).then(console.log)';
+    alert(msg);
+    btn.disabled=false;
+    btn.textContent=o;
+  }
+}
+async function init(){
+  const kpiMount=document.getElementById('execKpiMount');
+  const noteEl=document.getElementById('execSeasonNote');
+  const hero=document.getElementById('execHeroKpi');
+  try{
+    document.getElementById('loading').style.display='none';
+    if(hero)hero.innerHTML='<div class="kpi"><div class="kpi-label">Total Seasonal Revenue</div><div class="kpi-value" style="opacity:.4">—</div><div class="kpi-sub neutral">Loading…</div></div>'
+      +'<div class="kpi"><div class="kpi-label">Seasonal Revenue vs PY</div><div class="kpi-value" style="opacity:.4">—</div><div class="kpi-sub neutral">—</div></div>'
+      +'<div class="kpi"><div class="kpi-label">Total Unit Investment</div><div class="kpi-value" style="opacity:.4">—</div><div class="kpi-sub neutral">—</div></div>'
+      +'<div class="kpi"><div class="kpi-label">Unit Investment vs PY</div><div class="kpi-value" style="opacity:.4">—</div><div class="kpi-sub neutral">—</div></div>';
+    if(kpiMount) kpiMount.innerHTML=_execKpiSkeletonHtml();
+    if(noteEl) noteEl.textContent='Loading dashboard data…';
+    const resp=await fetch('/api/v1/data');
+    if(!resp.ok)throw new Error('API returned '+resp.status);
+    APP.data=await resp.json();
+    const d=APP.data;
+    const meta=d.m||{};
+    const isSf=meta.src==='snowflake+excel';
+    const rts=document.getElementById('refreshTs');
+    const nu=(d.u||[]).length,ndp=(d.dp||[]).length,nop=(d.op||[]).length,nfr=(d.fr||[]).length;
+    if(meta.ts){
+      const dt=new Date(meta.ts);
+      const fmt=dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' '+dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+      const srcLabel=isSf?'Snowflake APO + OP Submit':(meta.src==='excel-demand-plan'?'Excel only (not Snowflake)':'Unknown source');
+      if(rts)rts.innerHTML='Last blob: '+fmt+' · '+srcLabel+'<br><span style="font-weight:500;color:#888">Rows in blob — UIF: '+nu+' · APO/DP: '+ndp+' · OP: '+nop+' · Franchise: '+nfr+'</span>';
+    }
+    const ban=document.getElementById('dataSourceBanner');
+    if(ban){
+      ban.style.display='flex';
+      if(isSf){
+        ban.className='data-source-banner ok';
+        if(nu===0&&ndp===0){
+          ban.className='data-source-banner warn';
+          ban.innerHTML='<span><strong>Snowflake blob</strong> is loaded but <strong>UIF and APO/DP row counts are both 0</strong>. The app does not query Snowflake in the browser — only this file on DBFS. Check the job logs for </span><code>refresh_from_snowflake.py</code><span> (query returned 0 rows, or milestones/sports filtered everything out). OP can still show if OP Submit rows exist in the blob.</span>';
+        }else if(nu===0){
+          ban.className='data-source-banner warn';
+          ban.innerHTML='<span><strong>Snowflake APO</strong> — UIF row count is 0 (APO/DP: '+ndp+'). UIF only keeps milestones in the gate set (GCA…F4, LY). If this is unexpected, check </span><code>MILESTONE_CD</code><span> values in the view vs. </span><code>GATE_ORDER</code><span> in the ETL.</span>';
+        }else{
+          ban.textContent='Data pipeline: Snowflake APO (GLBL_DEMAND_PLAN_V) + OP Submit — production APO path.';
+        }
+      }else{
+        ban.className='data-source-banner warn';
+        ban.innerHTML='<span>Data pipeline: <strong>Excel / push_demand_plan</strong> (or older blob) — <strong>not</strong> Snowflake APO. APO tab filters use the Demand Plan Excel until you upload a Snowflake blob. To restore Snowflake: run </span><code>.\\scripts\\publish.ps1 -Data Snowflake -AppName &lt;your-app&gt;</code><span> locally (runs </span><code>refresh_from_snowflake.py</code><span> → DBFS), then </span><code>POST /api/v1/refresh</code><span> on the app (or wait up to 1h cache).</span>';
+      }
+    }
+    initExec();
+  }catch(e){
+    const ld=document.getElementById('loading');
+    if(ld){
+      ld.classList.add('loading-error');
+      ld.style.display='flex';
+      ld.innerHTML='<div style="text-align:center"><div style="font-size:1.2rem;font-weight:600;color:#f87171;">Failed to load data</div><div style="font-size:0.85rem;color:#a0a0a0;margin-top:0.5rem;">'+e.message+'</div><div style="font-size:0.8rem;color:#666;margin-top:1rem;">Run refresh_from_snowflake.py or push_demand_plan.py to upload data, then redeploy or refresh.</div></div>';
+    }
+  }
+}
+document.getElementById('reloadDbfsBtn')?.addEventListener('click',function(){ void reloadDataFromDbfs(); });
+init();
+</script>
+</body>
+</html>
